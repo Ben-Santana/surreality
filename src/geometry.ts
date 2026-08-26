@@ -1,4 +1,6 @@
 import type { Mapping, Point, Quad, Rgba, Surface } from "./types";
+import { getSpecial } from "./specials/registry";
+import { specialGeometry } from "./specials/types";
 
 export const HANDLE_RADIUS = 8;
 
@@ -176,12 +178,16 @@ function offsetAnchor(from: Point, center: Point, fallback: Point): Point {
 
 export function isCircleGeometry(mapping: Mapping): boolean {
   if (mapping.type === "circle") return true;
-  return mapping.type === "special" && mapping.config.geometry === "circle";
+  if (mapping.type !== "special") return false;
+  const definition = getSpecial(mapping.kind);
+  return specialGeometry(mapping, definition?.geometry) === "circle";
 }
 
 export function isPolygonGeometry(mapping: Mapping): boolean {
   if (mapping.type === "polygon") return true;
-  return mapping.type === "special" && mapping.config.geometry === "polygon";
+  if (mapping.type !== "special") return false;
+  const definition = getSpecial(mapping.kind);
+  return specialGeometry(mapping, definition?.geometry) === "polygon";
 }
 
 export function mappingAnchor(mapping: Mapping): Point {

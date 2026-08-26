@@ -67,6 +67,8 @@ export type TextMapping = MappingBase & {
 export type SpecialMapping = MappingBase & {
   type: "special";
   kind: string;
+  /** Definition version used to migrate persisted config safely. */
+  version?: number;
   config: Record<string, unknown>;
 };
 
@@ -114,20 +116,8 @@ export type RoomAPI = {
 
 export type SyncPayload = {
   mappings: Mapping[];
-  soundPulse?: { id: string; at: number };
-  shipPlay?: {
-    bullets: {
-      id: number;
-      x: number;
-      y: number;
-      tx: number;
-      ty: number;
-      color: Rgba;
-      opacity?: number;
-    }[];
-    charges?: { id: string; charge: number }[];
-    exhaust?: { id: number; x: number; y: number; r: number; opacity: number }[];
-  };
+  /** Ephemeral, definition-owned state. Never persisted or added to undo history. */
+  runtime?: Record<string, unknown>;
 };
 
 declare global {

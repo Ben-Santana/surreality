@@ -121,6 +121,7 @@ export function createSpecial(kind: string, position: Point): SpecialMapping | n
     id: id(),
     type: "special",
     kind: definition.kind,
+    version: definition.version ?? 1,
     name: nextName(`special:${definition.kind}`, definition.label),
     color: { ...definition.defaultColor },
     config: { ...definition.defaultConfig } as Record<string, unknown>,

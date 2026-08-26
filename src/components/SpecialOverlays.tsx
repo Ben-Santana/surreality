@@ -1,6 +1,6 @@
 import { isValidWarpQuad } from "../geometry";
 import { quadToMatrix3d } from "../quadTransform";
-import { asConfig, specialGeometry } from "../specials/types";
+import { definitionConfig, specialGeometry } from "../specials/types";
 import { getSpecial } from "../specials/registry";
 import type { Mapping, Point, SpecialMapping } from "../types";
 import { isSpecialMapping } from "../types";
@@ -15,7 +15,7 @@ function SpecialSurface({ mapping }: { mapping: SpecialMapping }) {
   const definition = getSpecial(mapping.kind);
   if (!definition) return null;
   const View = definition.View;
-  const config = asConfig(mapping, definition.defaultConfig);
+  const config = definitionConfig(definition, mapping);
   const geometry = specialGeometry(mapping, definition.geometry ?? "quad");
 
   if (geometry !== "quad") {

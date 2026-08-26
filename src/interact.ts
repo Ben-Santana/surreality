@@ -5,7 +5,8 @@ import {
   segmentsIntersect,
   translateVertices,
 } from "./geometry";
-import { activateSpecial, getSpecial } from "./specials/registry";
+import { getSpecial } from "./specials/registry";
+import { emitSpecialEvent } from "./specials/events";
 import type { Mapping, Point, SpecialMapping } from "./types";
 import { isSpecialMapping } from "./types";
 
@@ -71,7 +72,9 @@ export function mappingHitAlong(
 
 /** Click-equivalent: interactive specials with `onActivate`. */
 export function activateMapping(mapping: Mapping): boolean {
-  return isSpecialMapping(mapping) && activateSpecial(mapping);
+  if (!isSpecialMapping(mapping) || !getSpecial(mapping.kind)?.interactive) return false;
+  emitSpecialEvent({ type: "activate", targetId: mapping.id });
+  return true;
 }
 
 export function interactiveSpecialAt(mappings: Mapping[], point: Point): SpecialMapping | null {

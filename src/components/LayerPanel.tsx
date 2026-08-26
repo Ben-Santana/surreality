@@ -4,15 +4,14 @@ import {
   Circle,
   Frame,
   Pentagon,
-  Rocket,
   Sparkles,
   Type,
-  Volume2,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { rgbaCss } from "../geometry";
 import { useRoomStore } from "../store";
 import type { Mapping } from "../types";
+import { getSpecial } from "../specials/registry";
 
 const MAPPING_MIME = "application/x-room-mapping";
 
@@ -21,8 +20,8 @@ function mappingIcon(mapping: Mapping, selected: boolean) {
   if (mapping.type === "circle") return <Circle className={className} />;
   if (mapping.type === "text") return <Type className={className} />;
   if (mapping.type === "special") {
-    if (mapping.kind === "sound") return <Volume2 className={className} />;
-    if (mapping.kind === "ship") return <Rocket className={className} />;
+    const Icon = getSpecial(mapping.kind)?.icon;
+    if (Icon) return <Icon className={className} />;
     return <Sparkles className={className} />;
   }
   return <Pentagon className={className} />;

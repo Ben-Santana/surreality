@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { asQuad, centroid, lerp, translateVertices } from "../../geometry";
 import {
-  activateMapping,
   clampHullAgainstOccupants,
   mappingHitAlong,
   occupants,
@@ -41,6 +40,7 @@ import {
 import { useShipPlayStore, type ScreenBullet, type ScreenExhaust } from "./playStore";
 import { resumeThrustAudio, setThrustRumble, stopThrustRumble } from "./thrustSound";
 import { asConfig } from "../types";
+import { emitSpecialEvent } from "../events";
 
 type Bounds = { x: number; y: number; width: number; height: number };
 
@@ -469,7 +469,7 @@ export function useShipRuntime() {
           const origin = insideBounds(muzzle, bounds) ? muzzle : centroid(hull);
           const edge = rayExit(origin, nose, bounds);
           const hit = mappingHitAlong(occupants(mappings, ship), origin, edge, LASER_SAMPLE);
-          if (hit) activateMapping(hit.mapping);
+          if (hit) emitSpecialEvent({ type: "hit", sourceId: ship.id, targetId: hit.mapping.id, point: hit.point });
           lasers.push({
             id: nextLaserId,
             mappingId: ship.id,

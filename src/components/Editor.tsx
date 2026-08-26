@@ -9,7 +9,7 @@ import SpacePicker from "./SpacePicker";
 import Stage from "./Stage";
 import StatusBar from "./StatusBar";
 import Toolbar from "./Toolbar";
-import { useShipRuntime } from "../specials/ship/runtime";
+import { SpecialRuntimeHosts } from "../specials/RuntimeHosts";
 
 function isTypingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
@@ -18,7 +18,6 @@ function isTypingTarget(target: EventTarget | null) {
 }
 
 export default function Editor() {
-  useShipRuntime();
   const mappings = useRoomStore((state) => state.mappings);
   const editMode = useRoomStore((state) => state.editMode);
   const contextMenu = useRoomStore((state) => state.contextMenu);
@@ -132,6 +131,7 @@ export default function Editor() {
 
   return (
     <div className="relative h-screen bg-black">
+      <SpecialRuntimeHosts />
       {editMode ? (
         <div className="drag-region pointer-events-auto absolute left-0 top-0 z-50 h-12 w-[88px]" />
       ) : null}

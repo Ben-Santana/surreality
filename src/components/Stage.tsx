@@ -12,7 +12,7 @@ import { displayMappings, topSurfaceAt } from "../wall";
 import { GRID_STEPS, type Point } from "../types";
 import MappingCanvas, { canvasPoint } from "./MappingCanvas";
 import SpecialOverlays from "./SpecialOverlays";
-import { LiveShipBullets, LiveShipExhaust } from "../specials/ship/ShipBullets";
+import { SpecialRuntimeOverlays } from "../specials/RuntimeHosts";
 
 type Drag =
   | { type: "mapping"; id: string; kind: "vertex"; index: number }
@@ -217,9 +217,8 @@ export default function Stage() {
           });
         }}
       />
-      <LiveShipExhaust />
       <SpecialOverlays mappings={shown} />
-      <LiveShipBullets />
+      <SpecialRuntimeOverlays />
       {editMode ? (
         <MappingCanvas
           mappings={shown}

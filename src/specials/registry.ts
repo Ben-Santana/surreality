@@ -1,11 +1,15 @@
 import { feynmanSpecial } from "./feynman/definition";
 import { shipSpecial } from "./ship/definition";
 import { soundSpecial } from "./sound/definition";
-import { asConfig } from "./types";
+import { definitionConfig } from "./types";
 import type { SpecialDefinition } from "./types";
 import type { SpecialMapping } from "../types";
 
 export function registerSpecial<C>(definition: SpecialDefinition<C>): SpecialDefinition {
+  if (!definition.kind.trim()) throw new Error("A mapping definition needs a kind");
+  if (!Number.isFinite(definition.contentSize.width) || !Number.isFinite(definition.contentSize.height)) {
+    throw new Error(`Mapping definition ${definition.kind} has an invalid content size`);
+  }
   return definition as SpecialDefinition;
 }
 
@@ -31,6 +35,6 @@ export function listSpecials(): SpecialDefinition[] {
 export function activateSpecial(mapping: SpecialMapping): boolean {
   const definition = getSpecial(mapping.kind);
   if (!definition?.interactive || !definition.onActivate) return false;
-  definition.onActivate(mapping, asConfig(mapping, definition.defaultConfig));
+  definition.onActivate(mapping, definitionConfig(definition, mapping));
   return true;
 }

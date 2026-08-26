@@ -8,6 +8,9 @@
   "scripts": {
     "dev": "env -u ELECTRON_RUN_AS_NODE vite",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test tests/*.test.mjs",
+    "create:mapping": "node scripts/create-mapping.mjs",
     "preview": "vite preview",
     "start": "env -u ELECTRON_RUN_AS_NODE electron ."
   },

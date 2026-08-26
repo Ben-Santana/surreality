@@ -10,7 +10,7 @@ import {
 import type { ReactNode } from "react";
 import { centroid, isPolygonGeometry } from "../geometry";
 import { getSpecial } from "../specials/registry";
-import { asConfig } from "../specials/types";
+import { definitionConfig } from "../specials/types";
 import { useRoomStore } from "../store";
 import { displayVertices } from "../wall";
 import type { SpecialMapping } from "../types";
@@ -194,7 +194,7 @@ function SpecialInspector({ mapping }: { mapping: SpecialMapping }) {
   return (
     <InspectorFields
       mapping={mapping}
-      config={asConfig(mapping, definition.defaultConfig)}
+      config={definitionConfig(definition, mapping)}
       onChange={(config, extra) =>
         updateMapping(mapping.id, {
           config: config as Record<string, unknown>,

@@ -6,6 +6,7 @@ const pulseListeners = new Set<PulseListener>();
 const bufferCache = new Map<string, AudioBuffer>();
 
 let audioCtx: AudioContext | null = null;
+let pulse = { id: "", sequence: 0 };
 
 function context() {
   if (!audioCtx) audioCtx = new AudioContext();
@@ -21,7 +22,31 @@ export function onSoundPulse(listener: PulseListener) {
 }
 
 export function emitSoundPulse(id: string) {
+  pulse = { id, sequence: pulse.sequence + 1 };
   for (const listener of pulseListeners) listener(id);
+}
+
+export function soundSnapshot() {
+  return pulse;
+}
+
+export function applySoundSnapshot(value: unknown) {
+  if (!value || typeof value !== "object") return;
+  const next = value as Partial<typeof pulse>;
+  if (typeof next.id !== "string" || typeof next.sequence !== "number" || next.sequence <= pulse.sequence) return;
+  pulse = { id: next.id, sequence: next.sequence };
+  const mapping = (window as Window & { __roomMappings?: import("../../types").Mapping[] }).__roomMappings?.find((item) => item.id === next.id);
+  if (!mapping || mapping.type !== "special") return;
+  const config = mapping.config as unknown as SoundConfig;
+  playSound(config);
+}
+
+function playSound(config: SoundConfig) {
+  const ctx = context();
+  const volume = Math.max(0, Math.min(1, config.volume));
+  if (config.source === "custom" && config.customAudio) {
+    void playCustom(ctx, config.customAudio, volume).catch(() => playPreset(ctx, config.preset, volume));
+  } else playPreset(ctx, config.preset, volume);
 }
 
 function noiseBuffer(ctx: AudioContext, seconds: number) {
@@ -172,14 +197,5 @@ async function playCustom(ctx: AudioContext, dataUrl: string, volume: number) {
 
 export function activateSound(mapping: { id: string }, config: SoundConfig) {
   emitSoundPulse(mapping.id);
-
-  const ctx = context();
-  const volume = Math.max(0, Math.min(1, config.volume));
-  if (config.source === "custom" && config.customAudio) {
-    void playCustom(ctx, config.customAudio, volume).catch(() => {
-      playPreset(ctx, config.preset, volume);
-    });
-  } else {
-    playPreset(ctx, config.preset, volume);
-  }
+  playSound(config);
 }
