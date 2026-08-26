@@ -1,0 +1,156 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Chakra Petch";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/chakra-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Chakra Petch";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./fonts/chakra-500.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Chakra Petch";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./fonts/chakra-600.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Chakra Petch";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./fonts/chakra-700.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Share Tech Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/share-tech-mono.woff2") format("woff2");
+}
+
+@theme {
+  --font-sans: "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Share Tech Mono", ui-monospace, monospace;
+  --color-ink: #07070a;
+  --color-panel: #ffffff;
+  --color-panel-2: #fff7f2;
+  --color-line: #ffd6c4;
+  --color-muted: #c2410c;
+  --color-accent: #ff5314;
+  --color-warm: #ffb347;
+  --color-danger: #ff6b7a;
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-4xl: 0;
+  --radius: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: #07070a;
+  color: #f4f4f7;
+  overflow: hidden;
+  user-select: none;
+  font-family: var(--font-sans);
+  letter-spacing: 0.02em;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  border-radius: 0;
+}
+
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+.checker {
+  background-image:
+    linear-gradient(45deg, #d7d0c8 25%, transparent 25%),
+    linear-gradient(-45deg, #d7d0c8 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #d7d0c8 75%),
+    linear-gradient(-45deg, transparent 75%, #d7d0c8 75%);
+  background-size: 12px 12px;
+  background-position:
+    0 0,
+    0 6px,
+    6px -6px,
+    -6px 0;
+  background-color: #f4f1ec;
+}
+
+.analog-frame {
+  position: relative;
+}
+
+.analog-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--color-accent), var(--color-accent)) left top / 12px 1px no-repeat,
+    linear-gradient(var(--color-accent), var(--color-accent)) left top / 1px 12px no-repeat,
+    linear-gradient(var(--color-accent), var(--color-accent)) right top / 12px 1px no-repeat,
+    linear-gradient(var(--color-accent), var(--color-accent)) right top / 1px 12px no-repeat,
+    linear-gradient(var(--color-accent), var(--color-accent)) left bottom / 12px 1px no-repeat,
+    linear-gradient(var(--color-accent), var(--color-accent)) left bottom / 1px 12px no-repeat,
+    linear-gradient(var(--color-accent), var(--color-accent)) right bottom / 12px 1px no-repeat,
+    linear-gradient(var(--color-accent), var(--color-accent)) right bottom / 1px 12px no-repeat;
+}
+
+.chrome-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.panel-field {
+  border: 1px solid color-mix(in srgb, var(--color-accent) 28%, #e7e5e4);
+  background: #fff7f2;
+  color: #1c1917;
+}
+
+.panel-field:focus {
+  border-color: var(--color-accent);
+}
+
+.editor-panel .panel-field {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #1a1a1f;
+  color: #fafafa;
+}
+
+.editor-panel .panel-field:focus {
+  border-color: var(--color-accent);
+}

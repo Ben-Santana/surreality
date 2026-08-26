@@ -1,0 +1,248 @@
+import { useMemo, useRef, useState } from "react";
+import {
+  containsMapping,
+  containsSurface,
+  hitTestHandle,
+  hitTestSurfaceHandle,
+  snapPoint,
+} from "../geometry";
+import { activateMapping, interactiveSpecialAt } from "../interact";
+import { useRoomStore } from "../store";
+import { displayMappings, topSurfaceAt } from "../wall";
+import { GRID_STEPS, type Point } from "../types";
+import MappingCanvas, { canvasPoint } from "./MappingCanvas";
+import SpecialOverlays from "./SpecialOverlays";
+import { LiveShipBullets, LiveShipExhaust } from "../specials/ship/ShipBullets";
+
+type Drag =
+  | { type: "mapping"; id: string; kind: "vertex"; index: number }
+  | { type: "mapping"; id: string; kind: "anchor" }
+  | { type: "surface"; id: string; kind: "vertex"; index: number }
+  | { type: "surface"; id: string; kind: "anchor" };
+
+export default function Stage() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const dragRef = useRef<Drag | null>(null);
+  const mappings = useRoomStore((state) => state.mappings);
+  const surfaces = useRoomStore((state) => state.surfaces);
+  const selectedId = useRoomStore((state) => state.selectedId);
+  const editMode = useRoomStore((state) => state.editMode);
+  const showGrid = useRoomStore((state) => state.showGrid);
+  const snapToGrid = useRoomStore((state) => state.snapToGrid);
+  const gridSize = useRoomStore((state) => state.gridSize);
+  const tool = useRoomStore((state) => state.tool);
+  const setEditMode = useRoomStore((state) => state.setEditMode);
+  const select = useRoomStore((state) => state.select);
+  const addAt = useRoomStore((state) => state.addAt);
+  const moveVertex = useRoomStore((state) => state.moveVertex);
+  const moveAnchor = useRoomStore((state) => state.moveAnchor);
+  const moveSurfaceVertex = useRoomStore((state) => state.moveSurfaceVertex);
+  const moveSurfaceAnchor = useRoomStore((state) => state.moveSurfaceAnchor);
+  const endHistoryGesture = useRoomStore((state) => state.endHistoryGesture);
+  const openMenu = useRoomStore((state) => state.openMenu);
+  const closeMenu = useRoomStore((state) => state.closeMenu);
+  const spaceEntered = useRoomStore((state) => state.spaceEntered);
+  const [dropSurfaceId, setDropSurfaceId] = useState<string | null>(null);
+  const [hoverSound, setHoverSound] = useState(false);
+
+  // Mappings store unskewed geometry; the stage always works with how they
+  // currently appear through their surface.
+  const shown = useMemo(() => displayMappings(mappings, surfaces), [mappings, surfaces]);
+
+  const pointFromEvent = (event: { clientX: number; clientY: number }): Point | null => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    return canvasPoint(event, canvas);
+  };
+
+  return (
+    <div className="absolute inset-0 bg-black">
+      <MappingCanvas
+        canvasRef={canvasRef}
+        mappings={shown}
+        surfaces={surfaces}
+        edit={editMode}
+        selectedId={selectedId}
+        dropTargetId={dropSurfaceId}
+        grid={Boolean(editMode && (showGrid || !spaceEntered))}
+        gridStep={GRID_STEPS[gridSize]}
+        handles={false}
+        className={`block h-full w-full touch-none ${
+          editMode ? "cursor-crosshair" : hoverSound ? "cursor-pointer" : "cursor-default"
+        }`}
+        onPointerDown={(event) => {
+          if (!spaceEntered) return;
+          if (event.button === 2) return;
+          const point = pointFromEvent(event);
+          if (!point) return;
+          closeMenu();
+
+          if (!editMode) {
+            const pad = interactiveSpecialAt(shown, point);
+            if (pad) activateMapping(pad);
+            return;
+          }
+
+          if (tool !== "select") {
+            addAt(tool, point);
+            return;
+          }
+
+          const selectedMapping = shown.find((mapping) => mapping.id === selectedId);
+          if (selectedMapping) {
+            const handle = hitTestHandle(selectedMapping, point);
+            if (handle) {
+              dragRef.current =
+                handle.kind === "anchor"
+                  ? { type: "mapping", id: selectedMapping.id, kind: "anchor" }
+                  : { type: "mapping", id: selectedMapping.id, kind: "vertex", index: handle.index ?? 0 };
+              event.currentTarget.setPointerCapture(event.pointerId);
+              return;
+            }
+          }
+
+          const selectedSurface = surfaces.find((surface) => surface.id === selectedId);
+          if (selectedSurface) {
+            const handle = hitTestSurfaceHandle(selectedSurface, point);
+            if (handle) {
+              dragRef.current =
+                handle.kind === "anchor"
+                  ? { type: "surface", id: selectedSurface.id, kind: "anchor" }
+                  : { type: "surface", id: selectedSurface.id, kind: "vertex", index: handle.index ?? 0 };
+              event.currentTarget.setPointerCapture(event.pointerId);
+              return;
+            }
+          }
+
+          for (let index = shown.length - 1; index >= 0; index -= 1) {
+            const mapping = shown[index];
+            if (!mapping) continue;
+            const handle = hitTestHandle(mapping, point);
+            if (handle) {
+              select(mapping.id);
+              dragRef.current =
+                handle.kind === "anchor"
+                  ? { type: "mapping", id: mapping.id, kind: "anchor" }
+                  : { type: "mapping", id: mapping.id, kind: "vertex", index: handle.index ?? 0 };
+              event.currentTarget.setPointerCapture(event.pointerId);
+              return;
+            }
+            if (containsMapping(mapping, point)) {
+              select(mapping.id);
+              return;
+            }
+          }
+
+          for (let index = surfaces.length - 1; index >= 0; index -= 1) {
+            const surface = surfaces[index];
+            if (!surface) continue;
+            const handle = hitTestSurfaceHandle(surface, point);
+            if (handle) {
+              select(surface.id);
+              dragRef.current =
+                handle.kind === "anchor"
+                  ? { type: "surface", id: surface.id, kind: "anchor" }
+                  : { type: "surface", id: surface.id, kind: "vertex", index: handle.index ?? 0 };
+              event.currentTarget.setPointerCapture(event.pointerId);
+              return;
+            }
+            if (containsSurface(surface, point)) {
+              select(surface.id);
+              return;
+            }
+          }
+
+          select(null);
+          setEditMode(false);
+        }}
+        onPointerMove={(event) => {
+          const raw = pointFromEvent(event);
+          if (!editMode) {
+            setHoverSound(Boolean(raw && interactiveSpecialAt(shown, raw)));
+          }
+          const drag = dragRef.current;
+          if (!drag || !raw) return;
+          const point =
+            showGrid && snapToGrid ? snapPoint(raw, GRID_STEPS[gridSize]) : raw;
+          if (drag.type === "mapping") {
+            if (drag.kind === "anchor") {
+              moveAnchor(drag.id, point);
+              setDropSurfaceId(topSurfaceAt(surfaces, point)?.id ?? null);
+            } else {
+              moveVertex(drag.id, drag.index, point);
+            }
+            return;
+          }
+          if (drag.kind === "anchor") moveSurfaceAnchor(drag.id, point);
+          else moveSurfaceVertex(drag.id, drag.index, point);
+        }}
+        onPointerUp={() => {
+          dragRef.current = null;
+          setDropSurfaceId(null);
+          endHistoryGesture();
+        }}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          if (!spaceEntered) return;
+          const point = pointFromEvent(event);
+          if (!point) return;
+          setEditMode(true);
+          let mappingId: string | null = null;
+          let surfaceId: string | null = null;
+          for (let index = shown.length - 1; index >= 0; index -= 1) {
+            const mapping = shown[index];
+            if (mapping && containsMapping(mapping, point)) {
+              mappingId = mapping.id;
+              select(mapping.id);
+              break;
+            }
+          }
+          if (!mappingId) {
+            for (let index = surfaces.length - 1; index >= 0; index -= 1) {
+              const surface = surfaces[index];
+              if (surface && containsSurface(surface, point)) {
+                surfaceId = surface.id;
+                select(surface.id);
+                break;
+              }
+            }
+          }
+          openMenu({
+            x: event.clientX,
+            y: event.clientY,
+            canvasX: point.x,
+            canvasY: point.y,
+            mappingId,
+            surfaceId,
+          });
+        }}
+      />
+      <LiveShipExhaust />
+      <SpecialOverlays mappings={shown} />
+      <LiveShipBullets />
+      {editMode ? (
+        <MappingCanvas
+          mappings={shown}
+          surfaces={surfaces}
+          edit
+          selectedId={selectedId}
+          dropTargetId={dropSurfaceId}
+          layer="handles"
+          className="pointer-events-none absolute inset-0 h-full w-full"
+        />
+      ) : null}
+
+      {spaceEntered && editMode && mappings.length === 0 && surfaces.length === 0 ? (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="analog-frame max-w-sm rounded-none border border-white/10 bg-black/70 px-6 py-5 text-center backdrop-blur">
+            <p className="font-medium uppercase tracking-[0.18em] text-zinc-100">Add a mapping</p>
+            <p className="mt-2 text-[13px] leading-relaxed text-zinc-400">
+              Right-click the stage or pick a tool to add a mapping. Surfaces are rectangle
+              walls you can drop mappings onto.
+            </p>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
