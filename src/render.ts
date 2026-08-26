@@ -8,6 +8,7 @@ import {
   visibleSurfaceHandles,
 } from "./geometry";
 import { GRID_STEPS, type Mapping, type Point, type Rgba, type Surface, type TextMapping } from "./types";
+import { textFont } from "./textFonts";
 import { wallMetric, wallToScreenPoint } from "./wall";
 import { getSpecial } from "./specials/registry";
 import { specialGeometry } from "./specials/types";
@@ -45,34 +46,52 @@ function drawEllipse(ctx: CanvasRenderingContext2D, mapping: Mapping) {
   ctx.restore();
 }
 
-function textCacheKey(mapping: TextMapping) {
-  const { text, fontSize, color } = mapping;
-  return `${text}|${fontSize}|${color.r},${color.g},${color.b},${color.a}`;
+function quadRasterSize(vertices: Point[], pixelRatio: number) {
+  const [tl, tr, br, bl] = vertices;
+  if (!tl || !tr || !br || !bl) return { width: 1, height: 1 };
+  const width = Math.max(Math.hypot(tr.x - tl.x, tr.y - tl.y), Math.hypot(br.x - bl.x, br.y - bl.y));
+  const height = Math.max(Math.hypot(bl.x - tl.x, bl.y - tl.y), Math.hypot(br.x - tr.x, br.y - tr.y));
+  const scale = Math.min(pixelRatio, 4096 / Math.max(width, height, 1));
+  return {
+    width: Math.max(1, Math.ceil(width * scale)),
+    height: Math.max(1, Math.ceil(height * scale)),
+  };
 }
 
-function buildTextContent(mapping: TextMapping): HTMLCanvasElement {
+function textCacheKey(mapping: TextMapping, width: number, height: number) {
+  const { text, fontFamily, color } = mapping;
+  return `${text}|${fontFamily ?? "chakra"}|${width}x${height}|${color.r},${color.g},${color.b},${color.a}`;
+}
+
+function buildTextContent(mapping: TextMapping, pixelRatio: number): HTMLCanvasElement {
+  const { width, height } = quadRasterSize(mapping.vertices, pixelRatio);
   const cached = textCache.get(mapping.id);
-  const key = textCacheKey(mapping);
+  const key = textCacheKey(mapping, width, height);
   if (cached?.key === key) return cached.canvas;
 
   const textColor = contrastColor(mapping.color);
   const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext("2d");
   if (!ctx) return canvas;
 
-  ctx.font = `600 ${mapping.fontSize}px ui-sans-serif, system-ui, sans-serif`;
+  const font = textFont(mapping.fontFamily);
+  const horizontalPadding = width * 0.12;
+  const availableWidth = Math.max(1, width - horizontalPadding * 2);
+  let fontSize = Math.max(1, height * 0.52);
+  ctx.font = `${font.weight} ${fontSize}px ${font.family}`;
+  ctx.letterSpacing = `${font.tracking}em`;
   const metrics = ctx.measureText(mapping.text);
-  const padX = 28;
-  const padY = 20;
-  const textHeight = mapping.fontSize;
-  canvas.width = Math.max(1, Math.ceil(metrics.width + padX * 2));
-  canvas.height = Math.max(1, Math.ceil(textHeight + padY * 2));
-  ctx.font = `600 ${mapping.fontSize}px ui-sans-serif, system-ui, sans-serif`;
+  if (metrics.width > availableWidth) fontSize *= availableWidth / metrics.width;
+  ctx.font = `${font.weight} ${fontSize}px ${font.family}`;
+  ctx.letterSpacing = `${font.tracking}em`;
   ctx.fillStyle = rgbaCss(mapping.color);
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = rgbaCss(textColor);
+  ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(mapping.text, padX, canvas.height / 2);
+  ctx.fillText(mapping.text, canvas.width / 2, canvas.height / 2);
   textCache.set(mapping.id, { key, canvas });
   return canvas;
 }
@@ -89,7 +108,6 @@ function warpToQuad(
   const [tl, tr, br, bl] = corners;
   if (!tl || !tr || !br || !bl) return;
   const steps = Math.max(
-    source.height,
     Math.ceil(Math.hypot(tl.x - bl.x, tl.y - bl.y)),
     Math.ceil(Math.hypot(tr.x - br.x, tr.y - br.y)),
     1,
@@ -136,7 +154,8 @@ function warpToQuad(
 }
 
 function drawText(ctx: CanvasRenderingContext2D, mapping: TextMapping) {
-  const content = buildTextContent(mapping);
+  const pixelRatio = Math.max(1, ctx.getTransform().a || 1);
+  const content = buildTextContent(mapping, pixelRatio);
   warpToQuad(ctx, content, mapping.vertices);
 }
 

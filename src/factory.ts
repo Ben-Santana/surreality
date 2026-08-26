@@ -8,6 +8,7 @@ import type {
   Surface,
   TextMapping,
 } from "./types";
+import { DEFAULT_TEXT_FONT } from "./textFonts";
 
 const counters: Record<string, number> = {
   polygon: 0,
@@ -81,7 +82,7 @@ export function createText(position: Point): TextMapping {
     type: "text",
     name: nextName("text", "Text"),
     text: "Projection",
-    fontSize: 42,
+    fontFamily: DEFAULT_TEXT_FONT,
     color: { r: 36, g: 36, b: 42, a: 240 },
     vertices: [
       { x, y },

@@ -27,7 +27,7 @@ export const IDENTITY_SKEW: PanelSkew = [
   { x: 0, y: 0 },
 ];
 
-export const PANEL_SIZE = { width: 560, height: 516 };
+export const PANEL_SIZE = { width: 780, height: 516 };
 
 export type MappingType = "polygon" | "circle" | "text" | "special";
 
@@ -58,10 +58,13 @@ export type PolygonMapping = MappingBase & { type: "polygon" };
 
 export type CircleMapping = MappingBase & { type: "circle" };
 
+export type TextFontId = "chakra" | "mono" | "grotesk" | "editorial";
+
 export type TextMapping = MappingBase & {
   type: "text";
   text: string;
-  fontSize: number;
+  /** Optional so text mappings saved before font choices were added still load. */
+  fontFamily?: TextFontId;
 };
 
 export type SpecialMapping = MappingBase & {

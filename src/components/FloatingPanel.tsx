@@ -44,7 +44,13 @@ function axisAligned(corners: PanelSkew): PanelSkew {
 
 function readCorners(layout: PanelLayout | null): PanelSkew {
   if (layout && "corners" in layout && layout.corners?.length === 4) {
-    return axisAligned(layout.corners);
+    const corners = axisAligned(layout.corners);
+    const size = layoutSize(corners);
+    if (size.width < PANEL_SIZE.width) {
+      const origin = corners[0] ?? DEFAULT_POSITION;
+      return rectCorners(origin, { width: PANEL_SIZE.width, height: size.height });
+    }
+    return corners;
   }
   const legacy = layout as { position?: Point } | null;
   if (legacy?.position) {

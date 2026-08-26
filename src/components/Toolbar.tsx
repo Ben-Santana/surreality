@@ -130,7 +130,7 @@ export default function Toolbar() {
   }, [menu]);
 
   return (
-    <div className="flex flex-nowrap items-center gap-1">
+    <div className="flex flex-wrap items-center gap-1">
       <button
         type="button"
         title="Select (V)"

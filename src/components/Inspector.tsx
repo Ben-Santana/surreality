@@ -12,6 +12,7 @@ import { centroid, isPolygonGeometry } from "../geometry";
 import { getSpecial } from "../specials/registry";
 import { definitionConfig } from "../specials/types";
 import { useRoomStore } from "../store";
+import { DEFAULT_TEXT_FONT, TEXT_FONTS } from "../textFonts";
 import { displayVertices } from "../wall";
 import type { SpecialMapping } from "../types";
 import ColorPicker from "./ColorPicker";
@@ -114,19 +115,37 @@ export default function Inspector() {
               className="panel-field no-drag h-9 w-full rounded-none px-3 text-[13px] outline-none"
             />
           </label>
-          <label className="block space-y-1.5">
-            <span className="chrome-label">Font size</span>
-            <input
-              type="number"
-              min={12}
-              max={160}
-              value={selected.fontSize}
-              onChange={(event) =>
-                updateMapping(selected.id, { fontSize: Number(event.target.value) || 42 })
-              }
-              className="panel-field no-drag h-9 w-full rounded-none px-3 text-[13px] outline-none"
-            />
-          </label>
+          <div className="space-y-1.5">
+            <span className="chrome-label">Typeface</span>
+            <div className="grid grid-cols-2 gap-1.5">
+              {TEXT_FONTS.map((font) => {
+                const active = (selected.fontFamily ?? DEFAULT_TEXT_FONT) === font.id;
+                return (
+                  <button
+                    key={font.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => updateMapping(selected.id, { fontFamily: font.id })}
+                    className={`group flex h-14 flex-col items-start justify-center border px-3 text-left transition ${
+                      active
+                        ? "border-accent/70 bg-accent/15 text-white"
+                        : "border-white/10 bg-white/[0.025] text-white/55 hover:border-white/25 hover:bg-white/[0.06] hover:text-white"
+                    }`}
+                  >
+                    <span
+                      className="text-[19px] leading-none"
+                      style={{ fontFamily: font.family, fontWeight: font.weight }}
+                    >
+                      Aa
+                    </span>
+                    <span className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] opacity-60">
+                      {font.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       ) : null}
 
