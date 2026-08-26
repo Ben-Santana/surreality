@@ -18,14 +18,25 @@ export type ScreenExhaust = {
   opacity: number;
 };
 
+export type ScreenDock = {
+  x: number;
+  y: number;
+  r: number;
+  docked: boolean;
+  transition: number;
+  color: { r: number; g: number; b: number; a: number };
+};
+
 type ShipPlayState = {
   bullets: ScreenBullet[];
   charges: Record<string, number>;
   exhaust: ScreenExhaust[];
+  docks: Record<string, ScreenDock>;
   setPlay: (play: {
     bullets: ScreenBullet[];
     charges: Record<string, number>;
     exhaust: ScreenExhaust[];
+    docks: Record<string, ScreenDock>;
   }) => void;
 };
 
@@ -33,5 +44,6 @@ export const useShipPlayStore = create<ShipPlayState>((set) => ({
   bullets: [],
   charges: {},
   exhaust: [],
+  docks: {},
   setPlay: (play) => set(play),
 }));

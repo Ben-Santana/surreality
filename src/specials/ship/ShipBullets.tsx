@@ -1,3 +1,4 @@
+import { rgbaCss } from "../../geometry";
 import { useShipPlayStore, type ScreenExhaust } from "./playStore";
 import { LASER_WIDTH } from "./config";
 
@@ -9,6 +10,34 @@ export function LiveShipBullets() {
 export function LiveShipExhaust() {
   const exhaust = useShipPlayStore((state) => state.exhaust);
   return <ShipExhaust exhaust={exhaust} />;
+}
+
+export function LiveShipDocks() {
+  const docks = useShipPlayStore((state) => state.docks);
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      {Object.entries(docks).map(([id, dock]) => {
+        const size = dock.r * 2;
+        const pulse = Math.sin(dock.transition * Math.PI);
+        return (
+          <div
+            key={id}
+            className="absolute rounded-full border-2"
+            style={{
+              left: dock.x - dock.r,
+              top: dock.y - dock.r,
+              width: size,
+              height: size,
+              borderColor: rgbaCss({ ...dock.color, a: dock.docked ? 90 : 190 }),
+              background: dock.docked ? "transparent" : rgbaCss({ ...dock.color, a: 28 }),
+              boxShadow: `0 0 ${8 + pulse * 18}px ${rgbaCss({ ...dock.color, a: 150 })}`,
+              transform: `scale(${1 + pulse * 0.16})`,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
 }
 
 export function ShipExhaust({ exhaust }: { exhaust: ScreenExhaust[] }) {

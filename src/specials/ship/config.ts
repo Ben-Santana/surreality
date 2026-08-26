@@ -2,10 +2,12 @@ import type { Point } from "../../types";
 
 export type ShipConfig = {
   angle: number;
+  startsDocked: boolean;
 };
 
 export const defaultShipConfig: ShipConfig = {
   angle: 0,
+  startsDocked: false,
 };
 
 export const SHIP_CONTENT_SIZE = { width: 96, height: 96 };
@@ -30,6 +32,9 @@ export const LASER_MS = 70;
 export const LASER_WIDTH = 3;
 export const LASER_SAMPLE = 3.5;
 export const RECOIL_PX = 3;
+export const DOCK_RADIUS = 31;
+export const DOCK_CAPTURE_RADIUS = 38;
+export const DOCK_TRANSITION_MS = 420;
 export const CHARGE_IN = 7;
 export const CHARGE_OUT = 10;
 export const EXHAUST_RATE = 50;

@@ -12,6 +12,9 @@ import { surfaceById, wallMetric, wallToScreenPoint } from "../../wall";
 import {
   CHARGE_IN,
   CHARGE_OUT,
+  DOCK_CAPTURE_RADIUS,
+  DOCK_RADIUS,
+  DOCK_TRANSITION_MS,
   EXHAUST_LIFE_MS,
   EXHAUST_LIFE_SPREAD_MS,
   EXHAUST_RADIUS,
@@ -70,6 +73,7 @@ type InputState = {
   up: boolean;
   down: boolean;
   fire: boolean;
+  dock: boolean;
 };
 
 const emptyInput: InputState = {
@@ -78,6 +82,7 @@ const emptyInput: InputState = {
   up: false,
   down: false,
   fire: false,
+  dock: false,
 };
 
 type Motion = {
@@ -86,12 +91,21 @@ type Motion = {
   omega: number;
 };
 
+type DockMotion = {
+  center: Point;
+  phase: "docked" | "releasing" | "free" | "docking";
+  started: number;
+  from: Point;
+  captureArmed: boolean;
+};
+
 const LINEAR_STOP = 10;
 const TURN_STOP = 0.08;
 
 const MAX_EXHAUST = 220;
 
 let input: InputState = { ...emptyInput };
+let previousDockInput = false;
 let lasers: LocalLaser[] = [];
 let exhaust: LocalExhaust[] = [];
 let nextLaserId = 1;
@@ -100,6 +114,7 @@ const lastShotAt = new Map<string, number>();
 const motions = new Map<string, Motion>();
 const charges = new Map<string, number>();
 const exhaustAcc = new Map<string, number>();
+const docks = new Map<string, DockMotion>();
 
 function isTypingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
@@ -119,6 +134,7 @@ function shipConfig(mapping: SpecialMapping): ShipConfig {
   const current = asConfig(mapping, defaultShipConfig);
   return {
     angle: Number.isFinite(current.angle) ? current.angle : 0,
+    startsDocked: current.startsDocked === true,
   };
 }
 
@@ -258,6 +274,10 @@ function approach(current: number, target: number, rate: number, dt: number) {
 }
 
 function applyKey(event: KeyboardEvent, down: boolean) {
+  if (event.code === "KeyE" || event.key.toLowerCase() === "e") {
+    input.dock = down;
+    return true;
+  }
   if (event.code === "Space" || event.key === " " || event.key === "Spacebar") {
     input.fire = down;
     return true;
@@ -321,10 +341,29 @@ function publishPlay(now: number, mappings: Mapping[], surfaces: Surface[]) {
   }
   const nextCharges: Record<string, number> = {};
   for (const [id, value] of charges) nextCharges[id] = value;
+  const screenDocks: Record<string, import("./playStore").ScreenDock> = {};
+  for (const [id, dock] of docks) {
+    const mapping = byId.get(id);
+    if (!mapping || !isShip(mapping)) continue;
+    const center = toScreen(mapping, surfaces, dock.center);
+    const edge = toScreen(mapping, surfaces, { x: dock.center.x + DOCK_RADIUS, y: dock.center.y });
+    const elapsed = Math.max(0, now - dock.started);
+    screenDocks[id] = {
+      x: center.x,
+      y: center.y,
+      r: Math.hypot(edge.x - center.x, edge.y - center.y),
+      docked: dock.phase === "docked",
+      transition: dock.phase === "releasing" || dock.phase === "docking"
+        ? Math.min(1, elapsed / DOCK_TRANSITION_MS)
+        : 0,
+      color: mapping.color,
+    };
+  }
   useShipPlayStore.getState().setPlay({
     bullets: screen,
     charges: nextCharges,
     exhaust: screenExhaust,
+    docks: screenDocks,
   });
 }
 
@@ -335,8 +374,30 @@ function clearPlay() {
   motions.clear();
   charges.clear();
   exhaustAcc.clear();
+  docks.clear();
+  previousDockInput = false;
   setThrustRumble(false);
-  useShipPlayStore.getState().setPlay({ bullets: [], charges: {}, exhaust: [] });
+  useShipPlayStore.getState().setPlay({ bullets: [], charges: {}, exhaust: [], docks: {} });
+}
+
+function restoreShipsToDocks() {
+  if (docks.size === 0) return;
+  const state = useRoomStore.getState();
+  let changed = false;
+  const mappings = state.mappings.map((mapping) => {
+    const dock = docks.get(mapping.id);
+    if (!dock || !isShip(mapping)) return mapping;
+    const center = centroid(mapping.vertices);
+    const dx = dock.center.x - center.x;
+    const dy = dock.center.y - center.y;
+    if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) return mapping;
+    changed = true;
+    return {
+      ...mapping,
+      vertices: translateVertices(mapping.vertices, { x: dx, y: dy }),
+    };
+  });
+  if (changed) useRoomStore.setState({ mappings });
 }
 
 export function useShipRuntime() {
@@ -385,6 +446,8 @@ export function useShipRuntime() {
 
       let mappings = state.mappings;
       let moved = false;
+      const dockPressed = input.dock && !previousDockInput;
+      previousDockInput = input.dock;
       const liveShips = new Set(ships.map((ship) => ship.id));
       for (const id of [...motions.keys()]) {
         if (!liveShips.has(id)) motions.delete(id);
@@ -395,11 +458,34 @@ export function useShipRuntime() {
       for (const id of [...exhaustAcc.keys()]) {
         if (!liveShips.has(id)) exhaustAcc.delete(id);
       }
+      for (const id of [...docks.keys()]) {
+        if (!liveShips.has(id)) docks.delete(id);
+      }
 
       for (const ship of ships) {
         const config = shipConfig(ship);
         const bounds = playBounds(ship, state.surfaces);
         const motion = motionOf(ship.id);
+        let dock = docks.get(ship.id);
+        if (config.startsDocked && !dock) {
+          const center = centroid(ship.vertices);
+          dock = { center, phase: "docked", started: now, from: center, captureArmed: false };
+          docks.set(ship.id, dock);
+        } else if (!config.startsDocked && dock) {
+          docks.delete(ship.id);
+          dock = undefined;
+        }
+        if (dockPressed && dock?.phase === "docked") {
+          dock.phase = "releasing";
+          dock.started = now;
+          dock.captureArmed = false;
+          motion.vx = 0;
+          motion.vy = 0;
+        }
+        if (dock?.phase === "releasing" && now - dock.started >= DOCK_TRANSITION_MS) {
+          dock.phase = "free";
+          dock.started = now;
+        }
         let targetOmega = 0;
         if (input.left) targetOmega -= TURN_SPEED;
         if (input.right) targetOmega += TURN_SPEED;
@@ -410,11 +496,12 @@ export function useShipRuntime() {
 
         let targetVx = 0;
         let targetVy = 0;
-        if (input.up) {
+        const canFly = !dock || dock.phase === "free";
+        if (input.up && canFly) {
           targetVx += nose.x * THRUST_SPEED;
           targetVy += nose.y * THRUST_SPEED;
         }
-        if (input.down) {
+        if (input.down && canFly) {
           targetVx -= nose.x * THRUST_SPEED;
           targetVy -= nose.y * THRUST_SPEED;
         }
@@ -430,8 +517,45 @@ export function useShipRuntime() {
         }
 
         const firing = input.fire && now - (lastShotAt.get(ship.id) ?? 0) >= FIRE_COOLDOWN_MS;
-        const dx = motion.vx * dt + (firing ? -nose.x * RECOIL_PX : 0);
-        const dy = motion.vy * dt + (firing ? -nose.y * RECOIL_PX : 0);
+        if (!canFly) {
+          motion.vx = 0;
+          motion.vy = 0;
+        }
+        const recoil = canFly && firing ? RECOIL_PX : 0;
+        let dx = motion.vx * dt - nose.x * recoil;
+        let dy = motion.vy * dt - nose.y * recoil;
+        const shipCenter = centroid(ship.vertices);
+        const distanceFromDock = dock
+          ? Math.hypot(shipCenter.x - dock.center.x, shipCenter.y - dock.center.y)
+          : Number.POSITIVE_INFINITY;
+        // The furthest hull point is 36 local units from its center. Re-arm
+        // capture only once the complete ship has cleared the dock circle.
+        if (dock?.phase === "free" && distanceFromDock > DOCK_RADIUS + 36) {
+          dock.captureArmed = true;
+        }
+        if (
+          dock?.phase === "free" &&
+          dock.captureArmed &&
+          distanceFromDock <= DOCK_CAPTURE_RADIUS
+        ) {
+          dock.phase = "docking";
+          dock.started = now;
+          dock.from = shipCenter;
+          dock.captureArmed = false;
+          motion.vx = 0;
+          motion.vy = 0;
+        }
+        if (dock?.phase === "docking") {
+          const t = Math.min(1, (now - dock.started) / DOCK_TRANSITION_MS);
+          const eased = 1 - Math.pow(1 - t, 3);
+          const target = lerp(dock.from, dock.center, eased);
+          dx = target.x - shipCenter.x;
+          dy = target.y - shipCenter.y;
+          if (t >= 1) {
+            dock.phase = "docked";
+            dock.started = now;
+          }
+        }
         const hull = shipHull(ship.vertices, angle);
         const againstWalls = clampTranslation(hull, dx, dy, bounds);
         const againstMaps = clampHullAgainstOccupants(
@@ -481,7 +605,7 @@ export function useShipRuntime() {
           lastShotAt.set(ship.id, now);
         }
 
-        if (input.up || input.down) {
+        if (canFly && (input.up || input.down)) {
           let acc = (exhaustAcc.get(ship.id) ?? 0) + dt * EXHAUST_RATE;
           while (acc >= 1) {
             acc -= 1;
@@ -508,7 +632,8 @@ export function useShipRuntime() {
       if (exhaust.length > MAX_EXHAUST) exhaust = exhaust.slice(exhaust.length - MAX_EXHAUST);
 
       if (moved) useRoomStore.setState({ mappings });
-      setThrustRumble(input.up || input.down);
+      const anyFreeShip = ships.some((ship) => !docks.get(ship.id) || docks.get(ship.id)?.phase === "free");
+      setThrustRumble(anyFreeShip && (input.up || input.down));
       publishPlay(now, mappings, state.surfaces);
 
       frame = requestAnimationFrame(tick);
@@ -526,6 +651,7 @@ export function useShipRuntime() {
       window.removeEventListener("keyup", onKeyUp, true);
       window.removeEventListener("blur", onBlur);
       input = { ...emptyInput };
+      restoreShipsToDocks();
       clearPlay();
       stopThrustRumble();
     };
