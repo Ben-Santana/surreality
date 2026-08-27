@@ -1,14 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRoomStore } from "../store";
 import ContextMenu from "./ContextMenu";
 import FloatingPanel from "./FloatingPanel";
-import Inspector from "./Inspector";
-import LayerPanel from "./LayerPanel";
+import RoomPanel from "./RoomPanel";
 import SpaceNameDialog from "./SpaceNameDialog";
 import SpacePicker from "./SpacePicker";
 import Stage from "./Stage";
-import StatusBar from "./StatusBar";
-import Toolbar from "./Toolbar";
 import { SpecialRuntimeHosts } from "../specials/RuntimeHosts";
 
 function isTypingTarget(target: EventTarget | null) {
@@ -18,6 +15,7 @@ function isTypingTarget(target: EventTarget | null) {
 }
 
 export default function Editor() {
+  const [controlsDetached, setControlsDetached] = useState(false);
   const mappings = useRoomStore((state) => state.mappings);
   const editMode = useRoomStore((state) => state.editMode);
   const contextMenu = useRoomStore((state) => state.contextMenu);
@@ -32,6 +30,80 @@ export default function Editor() {
   const requestSave = useRoomStore((state) => state.requestSave);
   const undo = useRoomStore((state) => state.undo);
   const redo = useRoomStore((state) => state.redo);
+
+  const detachControls = (bounds?: { x: number; y: number; width: number; height: number }) => {
+    document.documentElement.classList.add("controls-detached");
+    const url = new URL(window.location.href);
+    url.search = "?mode=controls";
+    const placement = bounds
+      ? `,left=${bounds.x},top=${bounds.y}`
+      : "";
+    const popup = window.open(
+      url,
+      "room-controls",
+      `popup,width=${bounds?.width ?? 760},height=${bounds?.height ?? 720},resizable=yes${placement}`,
+    );
+    window.dispatchEvent(new CustomEvent("controls-window-opened", { detail: popup }));
+    popup?.focus();
+  };
+
+  useEffect(() => {
+    document.documentElement.classList.remove("controls-detached");
+    let popup: Window | null = null;
+    const lifecycle = new BroadcastChannel("projection-mapping-room-controls-lifecycle");
+    lifecycle.onmessage = (event: MessageEvent<unknown>) => {
+      if (event.data === "opened") {
+        document.documentElement.classList.add("controls-detached");
+        setControlsDetached(true);
+      }
+      if (event.data === "closed") {
+        document.documentElement.classList.remove("controls-detached");
+        setControlsDetached(false);
+      }
+    };
+    const opened = (event: Event) => {
+      popup = (event as CustomEvent<Window>).detail;
+      setControlsDetached(true);
+    };
+    const closed = (event: MessageEvent<unknown>) => {
+      const message = event.data as {
+        type?: string;
+        bounds?: { x: number; y: number; width: number; height: number };
+      } | null;
+      if (message?.type !== "room-controls-closed") return;
+      const bounds = message.bounds;
+      if (bounds) {
+        const x = bounds.x - window.screenX;
+        const y = bounds.y - window.screenY;
+        useRoomStore.getState().setPanelLayout({
+          corners: [
+            { x, y },
+            { x: x + bounds.width, y },
+            { x: x + bounds.width, y: y + bounds.height },
+            { x, y: y + bounds.height },
+          ],
+        });
+      }
+      popup = null;
+      document.documentElement.classList.remove("controls-detached");
+      setControlsDetached(false);
+    };
+    window.addEventListener("controls-window-opened", opened);
+    window.addEventListener("message", closed);
+    const timer = window.setInterval(() => {
+      if (popup?.closed) {
+        popup = null;
+        document.documentElement.classList.remove("controls-detached");
+        setControlsDetached(false);
+      }
+    }, 250);
+    return () => {
+      lifecycle.close();
+      window.removeEventListener("controls-window-opened", opened);
+      window.removeEventListener("message", closed);
+      window.clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     const runUndo = () => {
@@ -101,6 +173,7 @@ export default function Editor() {
       if (event.key.toLowerCase() === "p") setTool("polygon");
       if (event.key.toLowerCase() === "c") setTool("circle");
       if (event.key.toLowerCase() === "t") setTool("text");
+      if (event.key.toLowerCase() === "m") setTool("special", "media");
       if (event.key.toLowerCase() === "s") setTool("special");
       if (event.key.toLowerCase() === "g") toggleGrid();
     };
@@ -136,37 +209,18 @@ export default function Editor() {
         <div className="drag-region pointer-events-auto absolute left-0 top-0 z-50 h-12 w-[88px]" />
       ) : null}
       <Stage />
-      {spaceEntered && editMode ? (
+      {spaceEntered && editMode && !controlsDetached ? (
         <FloatingPanel
           title="Room"
+          className="embedded-room-panel"
+          onDetach={detachControls}
           accessory={
             <span className="font-mono text-[11px] tracking-widest text-accent">
               {String(mappings.length).padStart(2, "0")}
             </span>
           }
         >
-          <div className="flex min-h-0 flex-1 flex-col">
-            <div className="relative z-30 shrink-0 overflow-visible border-b border-white/10 px-1 py-1">
-              <Toolbar />
-            </div>
-            <div className="flex min-h-0 flex-1 overflow-hidden">
-              <section className="flex w-52 shrink-0 flex-col border-r border-white/10">
-                <p className="chrome-label px-3 py-2">Mappings</p>
-                <div className="min-h-0 flex-1 overflow-auto">
-                  <LayerPanel />
-                </div>
-              </section>
-              <section className="flex min-w-0 flex-1 flex-col">
-                <p className="chrome-label px-4 py-2">Inspector</p>
-                <div className="min-h-0 flex-1 overflow-auto">
-                  <Inspector />
-                </div>
-              </section>
-            </div>
-            <div className="shrink-0 border-t border-white/10 px-3">
-              <StatusBar />
-            </div>
-          </div>
+          <RoomPanel />
         </FloatingPanel>
       ) : null}
       {spaceEntered ? <ContextMenu /> : <SpacePicker />}

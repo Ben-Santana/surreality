@@ -46,7 +46,7 @@ import type {
 } from "./types";
 import { IDENTITY_SKEW, PANEL_SIZE } from "./types";
 
-import { listSpecials } from "./specials/registry";
+import { listSpecialMappingChoices } from "./specials/registry";
 
 type HistorySnapshot = {
   mappings: Mapping[];
@@ -79,6 +79,7 @@ type RoomState = {
   setGridSize: (size: GridSize) => void;
   select: (id: string | null) => void;
   addPolygon: (position: Point) => void;
+  addPolygonVertices: (vertices: Point[]) => void;
   addCircle: (position: Point) => void;
   addText: (position: Point) => void;
   addSurface: (position: Point) => void;
@@ -377,7 +378,7 @@ export const useRoomStore = create<RoomState>()(
       snapToGrid: false,
       gridSize: "medium",
       tool: "select",
-      specialKind: listSpecials()[0]?.kind ?? "feynman",
+      specialKind: listSpecialMappingChoices()[0]?.kind ?? "feynman",
       contextMenu: null,
       projectorOpen: false,
       panelLayout: null,
@@ -407,6 +408,18 @@ export const useRoomStore = create<RoomState>()(
       select: (id) => set({ selectedId: id, editMode: true }),
       addPolygon: (position) => {
         const mapping = createPolygon(position);
+        withHistory(set, get, {
+          mappings: [...get().mappings, mapping],
+          selectedId: mapping.id,
+          tool: "select",
+          editMode: true,
+        });
+      },
+      addPolygonVertices: (vertices) => {
+        if (vertices.length < 3) return;
+        const first = vertices[0];
+        if (!first) return;
+        const mapping = { ...createPolygon(first), vertices: vertices.map((vertex) => ({ ...vertex })) };
         withHistory(set, get, {
           mappings: [...get().mappings, mapping],
           selectedId: mapping.id,

@@ -8,6 +8,21 @@ contextBridge.exposeInMainWorld("room", {
   getDisplays: () => ipcRenderer.invoke("displays"),
   openOutput: (displayId?: number) => ipcRenderer.invoke("open-output", displayId),
   closeOutput: () => ipcRenderer.invoke("close-output"),
+  openControls: () => ipcRenderer.invoke("open-controls"),
+  closeControls: () => ipcRenderer.invoke("close-controls"),
+  isControlsOpen: () => ipcRenderer.invoke("controls-open"),
+  getControlsState: () => ipcRenderer.invoke("controls-state"),
+  onControlsClosed: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on("controls-closed", handler);
+    return () => ipcRenderer.removeListener("controls-closed", handler);
+  },
+  syncControls: (payload: unknown) => ipcRenderer.send("controls-sync", payload),
+  onControlsSync: (callback: (payload: unknown) => void) => {
+    const handler = (_event: unknown, payload: unknown) => callback(payload);
+    ipcRenderer.on("controls-sync", handler);
+    return () => ipcRenderer.removeListener("controls-sync", handler);
+  },
   onOutputClosed: (callback: () => void) => {
     const handler = () => callback();
     ipcRenderer.on("output-closed", handler);

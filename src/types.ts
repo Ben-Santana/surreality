@@ -60,11 +60,24 @@ export type CircleMapping = MappingBase & { type: "circle" };
 
 export type TextFontId = "chakra" | "mono" | "grotesk" | "editorial";
 
+export type TextContentMode = "text" | "clock";
+export type ClockStyle = "digital" | "analog";
+export type ClockFaceStyle = "minimal" | "ticks" | "numerals";
+
 export type TextMapping = MappingBase & {
   type: "text";
   text: string;
   /** Optional so text mappings saved before font choices were added still load. */
   fontFamily?: TextFontId;
+  /** Optional clock fields keep older saved text mappings compatible. */
+  contentMode?: TextContentMode;
+  clockStyle?: ClockStyle;
+  clockFaceStyle?: ClockFaceStyle;
+  clock24Hour?: boolean;
+  clockShowSeconds?: boolean;
+  clockShowDate?: boolean;
+  clockShowBackground?: boolean;
+  clockGlow?: boolean;
 };
 
 export type SpecialMapping = MappingBase & {
@@ -110,6 +123,13 @@ export type RoomAPI = {
   getDisplays: () => Promise<DisplayInfo[]>;
   openOutput: (displayId?: number) => Promise<void>;
   closeOutput: () => Promise<void>;
+  openControls: () => Promise<void>;
+  closeControls: () => Promise<void>;
+  isControlsOpen: () => Promise<boolean>;
+  getControlsState: () => Promise<unknown>;
+  onControlsClosed: (callback: () => void) => () => void;
+  syncControls: (payload: unknown) => void;
+  onControlsSync: (callback: (payload: unknown) => void) => () => void;
   onOutputClosed: (callback: () => void) => () => void;
   onUndo: (callback: () => void) => () => void;
   onRedo: (callback: () => void) => () => void;

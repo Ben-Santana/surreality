@@ -174,6 +174,10 @@ function playPreset(ctx: AudioContext, preset: SoundPresetId, volume: number) {
   }
 }
 
+export function playSoundPreset(preset: SoundPresetId, volume = 0.85) {
+  playPreset(context(), preset, Math.max(0, Math.min(1, volume)));
+}
+
 async function decodeCustom(ctx: AudioContext, dataUrl: string) {
   const cached = bufferCache.get(dataUrl);
   if (cached) return cached;

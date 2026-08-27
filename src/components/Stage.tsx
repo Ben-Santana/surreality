@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   containsMapping,
   containsSurface,
@@ -8,7 +8,7 @@ import {
 } from "../geometry";
 import { activateMapping, interactiveSpecialAt } from "../interact";
 import { useRoomStore } from "../store";
-import { displayMappings, topSurfaceAt } from "../wall";
+import { displayMappings, screenToWallPoint, topSurfaceAt, wallToScreenPoint } from "../wall";
 import { GRID_STEPS, type Point } from "../types";
 import MappingCanvas, { canvasPoint } from "./MappingCanvas";
 import SpecialOverlays from "./SpecialOverlays";
@@ -34,6 +34,7 @@ export default function Stage() {
   const setEditMode = useRoomStore((state) => state.setEditMode);
   const select = useRoomStore((state) => state.select);
   const addAt = useRoomStore((state) => state.addAt);
+  const addPolygonVertices = useRoomStore((state) => state.addPolygonVertices);
   const moveVertex = useRoomStore((state) => state.moveVertex);
   const moveAnchor = useRoomStore((state) => state.moveAnchor);
   const moveSurfaceVertex = useRoomStore((state) => state.moveSurfaceVertex);
@@ -44,6 +45,15 @@ export default function Stage() {
   const spaceEntered = useRoomStore((state) => state.spaceEntered);
   const [dropSurfaceId, setDropSurfaceId] = useState<string | null>(null);
   const [hoverSound, setHoverSound] = useState(false);
+  const [polygonDraft, setPolygonDraft] = useState<Point[]>([]);
+  const [polygonPointer, setPolygonPointer] = useState<Point | null>(null);
+
+  useEffect(() => {
+    if (tool !== "polygon" || !editMode) {
+      setPolygonDraft([]);
+      setPolygonPointer(null);
+    }
+  }, [editMode, tool]);
 
   // Mappings store unskewed geometry; the stage always works with how they
   // currently appear through their surface.
@@ -53,6 +63,15 @@ export default function Stage() {
     const canvas = canvasRef.current;
     if (!canvas) return null;
     return canvasPoint(event, canvas);
+  };
+
+  const snappedPoint = (point: Point): Point => {
+    if (!showGrid || !snapToGrid) return point;
+    const step = GRID_STEPS[gridSize];
+    const surface = topSurfaceAt(surfaces, point);
+    if (!surface) return snapPoint(point, step);
+    const local = screenToWallPoint(surface, point);
+    return wallToScreenPoint(surface, snapPoint(local, step));
   };
 
   return (
@@ -84,7 +103,20 @@ export default function Stage() {
           }
 
           if (tool !== "select") {
-            addAt(tool, point);
+            if (tool === "polygon") {
+              const vertex = snappedPoint(point);
+              const origin = polygonDraft[0];
+              if (origin && polygonDraft.length >= 3 && Math.hypot(vertex.x - origin.x, vertex.y - origin.y) <= 14) {
+                addPolygonVertices(polygonDraft);
+                setPolygonDraft([]);
+                setPolygonPointer(null);
+              } else {
+                setPolygonDraft((vertices) => [...vertices, vertex]);
+                setPolygonPointer(vertex);
+              }
+              return;
+            }
+            addAt(tool, snappedPoint(point));
             return;
           }
 
@@ -157,13 +189,15 @@ export default function Stage() {
         }}
         onPointerMove={(event) => {
           const raw = pointFromEvent(event);
+          if (editMode && tool === "polygon" && raw) {
+            setPolygonPointer(snappedPoint(raw));
+          }
           if (!editMode) {
             setHoverSound(Boolean(raw && interactiveSpecialAt(shown, raw)));
           }
           const drag = dragRef.current;
           if (!drag || !raw) return;
-          const point =
-            showGrid && snapToGrid ? snapPoint(raw, GRID_STEPS[gridSize]) : raw;
+          const point = snappedPoint(raw);
           if (drag.type === "mapping") {
             if (drag.kind === "anchor") {
               moveAnchor(drag.id, point);
@@ -217,6 +251,30 @@ export default function Stage() {
           });
         }}
       />
+      {editMode && tool === "polygon" && polygonDraft.length > 0 ? (
+        <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
+          <polyline
+            points={[...polygonDraft, ...(polygonPointer ? [polygonPointer] : [])]
+              .map((point) => `${point.x},${point.y}`)
+              .join(" ")}
+            fill="none"
+            stroke="white"
+            strokeWidth="2"
+            strokeDasharray="6 5"
+          />
+          {polygonDraft.map((vertex, index) => (
+            <circle
+              key={`${vertex.x}-${vertex.y}-${index}`}
+              cx={vertex.x}
+              cy={vertex.y}
+              r={index === 0 ? 7 : 4}
+              fill={index === 0 ? "#ff5314" : "white"}
+              stroke="black"
+              strokeWidth="2"
+            />
+          ))}
+        </svg>
+      ) : null}
       <SpecialOverlays mappings={shown} />
       <SpecialRuntimeOverlays />
       {editMode ? (

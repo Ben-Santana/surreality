@@ -40,6 +40,46 @@ export function LiveShipDocks() {
   );
 }
 
+export function LiveShipMinigame() {
+  const game = useShipPlayStore((state) => state.game);
+  if (game.phase === "idle") return null;
+  return (
+    <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
+      {game.stars.map((star) => (
+        (() => {
+          const height = Math.max(star.r * 2, star.length);
+          return (
+            <div
+              key={`star-${star.id}`}
+              className="absolute rounded-full bg-white"
+              style={{
+                left: star.x - star.r,
+                top: star.y - height + star.r,
+                width: star.r * 2,
+                height,
+                opacity: star.opacity,
+              }}
+            />
+          );
+        })()
+      ))}
+      {game.enemies.map((enemy) => (
+        <div
+          key={`enemy-${enemy.id}`}
+          className="absolute rounded-full bg-red-600"
+          style={{
+            left: enemy.x - enemy.r,
+            top: enemy.y - enemy.r,
+            width: enemy.r * 2,
+            height: enemy.r * 2,
+            opacity: enemy.opacity,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function ShipExhaust({ exhaust }: { exhaust: ScreenExhaust[] }) {
   if (exhaust.length === 0) return null;
 

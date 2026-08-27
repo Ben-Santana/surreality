@@ -20,9 +20,20 @@ export function ShipView({ mapping, config }: SpecialViewProps<ShipConfig>) {
   const fill = rgbaCss({ ...mapping.color, a: 255 });
   const charge = useShipPlayStore((state) => state.charges[mapping.id] ?? 0);
   const dock = useShipPlayStore((state) => state.docks[mapping.id]);
+  const game = useShipPlayStore((state) => state.game);
   // In the editor there is no live runtime dock state, so preview the ship's
   // configured starting pose. Present mode supplies the authoritative state.
-  const docked = dock?.docked ?? current.startsDocked;
+  // A minigame ship is detached even though its dock remains anchored and
+  // visible in the runtime store.
+  const inGame = game.activeShipId === mapping.id;
+  const docked = !inGame && (dock?.docked ?? current.startsDocked);
+  if (game.hiddenShipIds.includes(mapping.id)) return null;
+  const gamePhase = inGame ? game.phase : "idle";
+  const gameStyle = gamePhase === "dying"
+    ? { opacity: 0, transform: "scale(1.8) rotate(24deg)", transition: "opacity 420ms, transform 420ms" }
+    : gamePhase === "respawning"
+      ? { animation: "ship-minigame-respawn 700ms ease-out both" }
+      : undefined;
 
   return (
     <svg
@@ -30,6 +41,7 @@ export function ShipView({ mapping, config }: SpecialViewProps<ShipConfig>) {
       viewBox="0 0 100 100"
       role="img"
       aria-label="Spaceship"
+      style={gameStyle}
     >
       <g transform={`translate(50 50) rotate(${(current.angle * 180) / Math.PI})`}>
         {docked ? (

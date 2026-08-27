@@ -60,7 +60,97 @@ function quadRasterSize(vertices: Point[], pixelRatio: number) {
 
 function textCacheKey(mapping: TextMapping, width: number, height: number) {
   const { text, fontFamily, color } = mapping;
-  return `${text}|${fontFamily ?? "chakra"}|${width}x${height}|${color.r},${color.g},${color.b},${color.a}`;
+  const clockKey = mapping.contentMode === "clock"
+    ? `${mapping.clockStyle}|${mapping.clockFaceStyle}|${mapping.clock24Hour}|${mapping.clockShowSeconds}|${mapping.clockShowDate}|${mapping.clockShowBackground}|${mapping.clockGlow}|${Math.floor(Date.now() / (mapping.clockShowSeconds === false ? 60_000 : 1_000))}`
+    : "text";
+  return `${text}|${fontFamily ?? "chakra"}|${clockKey}|${width}x${height}|${color.r},${color.g},${color.b},${color.a}`;
+}
+
+function drawClock(mapping: TextMapping, ctx: CanvasRenderingContext2D, width: number, height: number) {
+  const now = new Date();
+  const foreground = mapping.clockShowBackground === false ? mapping.color : contrastColor(mapping.color);
+  if (mapping.clockShowBackground !== false) {
+    ctx.fillStyle = rgbaCss(mapping.color);
+    ctx.fillRect(0, 0, width, height);
+  }
+  ctx.fillStyle = rgbaCss(foreground);
+  ctx.strokeStyle = rgbaCss(foreground);
+  if (mapping.clockGlow) {
+    ctx.shadowColor = rgbaCss(foreground);
+    ctx.shadowBlur = Math.max(5, Math.min(width, height) * 0.045);
+  }
+
+  if ((mapping.clockStyle ?? "digital") === "digital") {
+    const font = textFont(mapping.fontFamily);
+    const includeSeconds = mapping.clockShowSeconds !== false;
+    const time = new Intl.DateTimeFormat(undefined, {
+      hour: "2-digit", minute: "2-digit", second: includeSeconds ? "2-digit" : undefined,
+      hour12: !(mapping.clock24Hour ?? false),
+    }).format(now);
+    const date = mapping.clockShowDate
+      ? new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric" }).format(now).toUpperCase()
+      : "";
+    const mainSize = height * (date ? 0.43 : 0.55);
+    ctx.font = `${font.weight} ${mainSize}px ${font.family}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(time, width / 2, height * (date ? 0.43 : 0.5), width * 0.88);
+    if (date) {
+      ctx.globalAlpha = 0.68;
+      ctx.font = `500 ${height * 0.12}px ${font.family}`;
+      ctx.letterSpacing = "0.18em";
+      ctx.fillText(date, width / 2, height * 0.77, width * 0.8);
+    }
+    return;
+  }
+
+  const radius = Math.min(width, height) * 0.4;
+  const cx = width / 2;
+  const cy = height / 2;
+  const face = mapping.clockFaceStyle ?? "ticks";
+  ctx.lineCap = "round";
+  ctx.lineWidth = Math.max(1.5, radius * 0.014);
+  ctx.globalAlpha = 0.5;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  for (let index = 0; index < 60; index += 1) {
+    if (face === "minimal" && index % 15 !== 0) continue;
+    if (face === "numerals" && index % 5 === 0) continue;
+    const major = index % 5 === 0;
+    const angle = index * Math.PI / 30 - Math.PI / 2;
+    const outer = radius * 0.9;
+    const inner = radius * (major ? 0.78 : 0.85);
+    ctx.globalAlpha = major ? 0.9 : 0.32;
+    ctx.lineWidth = Math.max(1, radius * (major ? 0.018 : 0.008));
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(angle) * inner, cy + Math.sin(angle) * inner);
+    ctx.lineTo(cx + Math.cos(angle) * outer, cy + Math.sin(angle) * outer);
+    ctx.stroke();
+  }
+  if (face === "numerals") {
+    ctx.globalAlpha = 0.8;
+    ctx.font = `500 ${radius * 0.18}px ${textFont(mapping.fontFamily).family}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (let hour = 1; hour <= 12; hour += 1) {
+      const angle = hour * Math.PI / 6 - Math.PI / 2;
+      ctx.fillText(String(hour), cx + Math.cos(angle) * radius * 0.72, cy + Math.sin(angle) * radius * 0.72);
+    }
+  }
+  const seconds = now.getSeconds() + now.getMilliseconds() / 1000;
+  const minutes = now.getMinutes() + seconds / 60;
+  const hours = (now.getHours() % 12) + minutes / 60;
+  const hand = (angle: number, length: number, lineWidth: number, alpha = 1) => {
+    ctx.globalAlpha = alpha; ctx.lineWidth = lineWidth; ctx.beginPath(); ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.sin(angle) * length, cy - Math.cos(angle) * length); ctx.stroke();
+  };
+  hand(hours * Math.PI / 6, radius * 0.48, radius * 0.055);
+  hand(minutes * Math.PI / 30, radius * 0.7, radius * 0.032);
+  if (mapping.clockShowSeconds !== false) hand(seconds * Math.PI / 30, radius * 0.76, radius * 0.012, 0.72);
+  ctx.globalAlpha = 1;
+  ctx.beginPath(); ctx.arc(cx, cy, radius * 0.045, 0, Math.PI * 2); ctx.fill();
 }
 
 function buildTextContent(mapping: TextMapping, pixelRatio: number): HTMLCanvasElement {
@@ -75,6 +165,12 @@ function buildTextContent(mapping: TextMapping, pixelRatio: number): HTMLCanvasE
   canvas.height = height;
   const ctx = canvas.getContext("2d");
   if (!ctx) return canvas;
+
+  if (mapping.contentMode === "clock") {
+    drawClock(mapping, ctx, width, height);
+    textCache.set(mapping.id, { key, canvas });
+    return canvas;
+  }
 
   const font = textFont(mapping.fontFamily);
   const horizontalPadding = width * 0.12;

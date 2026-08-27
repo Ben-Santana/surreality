@@ -123,6 +123,26 @@ export default function MappingCanvas({
     paint(ctx, canvas, mappings, surfaces, { edit, selectedId, dropTargetId, grid, gridStep, handles, layer });
   }, [dropTargetId, edit, grid, gridStep, handles, layer, mappings, ref, selectedId, surfaces]);
 
+  const hasClock = layer === "stage" && mappings.some(
+    (mapping) => mapping.type === "text" && mapping.contentMode === "clock",
+  );
+  useEffect(() => {
+    if (!hasClock) return;
+    let frame = 0;
+    let last = 0;
+    const animate = (now: number) => {
+      if (now - last >= 100) {
+        const canvas = ref.current;
+        const ctx = canvas?.getContext("2d");
+        if (canvas && ctx) paint(ctx, canvas, mappingsRef.current, surfacesRef.current, optionsRef.current);
+        last = now;
+      }
+      frame = requestAnimationFrame(animate);
+    };
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
+  }, [hasClock, ref]);
+
   return (
     <canvas
       ref={ref}

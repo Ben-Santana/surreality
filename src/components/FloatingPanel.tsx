@@ -81,11 +81,13 @@ export default function FloatingPanel({
   accessory,
   className = "",
   children,
+  onDetach,
 }: {
   title?: string;
   accessory?: ReactNode;
   className?: string;
   children: ReactNode;
+  onDetach?: (bounds: { x: number; y: number; width: number; height: number }) => void;
 }) {
   const dragRef = useRef<{ pointerX: number; pointerY: number; corners: PanelSkew } | null>(null);
   const stored = useRoomStore((state) => state.panelLayout);
@@ -127,7 +129,23 @@ export default function FloatingPanel({
     });
   };
 
-  const onHandlePointerUp = () => {
+  const onHandlePointerUp = (event: PointerEvent<HTMLElement>) => {
+    const drag = dragRef.current;
+    const outside =
+      event.clientX < 0 ||
+      event.clientY < 0 ||
+      event.clientX > window.innerWidth ||
+      event.clientY > window.innerHeight;
+    if (drag && outside && onDetach) {
+      const grabX = drag.pointerX - (drag.corners[0]?.x ?? 0);
+      const grabY = drag.pointerY - (drag.corners[0]?.y ?? 0);
+      onDetach({
+        x: Math.round(window.screenX + event.clientX - grabX),
+        y: Math.round(window.screenY + event.clientY - grabY),
+        width: Math.round(size.width),
+        height: Math.round(size.height),
+      });
+    }
     dragRef.current = null;
   };
 

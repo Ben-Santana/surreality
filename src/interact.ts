@@ -84,6 +84,40 @@ export function interactiveSpecialAt(mappings: Mapping[], point: Point): Special
   return hit;
 }
 
+/** Whether a segment intersects the ellipse described by two (possibly skewed) axes. */
+function segmentIntersectsEllipse(
+  start: Point,
+  end: Point,
+  center: Point,
+  axisU: Point,
+  axisV: Point,
+): boolean {
+  const det = axisU.x * axisV.y - axisU.y * axisV.x;
+  if (Math.abs(det) < 1e-6) return false;
+
+  // Transform the segment into ellipse-local coordinates, where the ellipse
+  // is a unit circle, then find the closest point on the segment to its center.
+  const local = (point: Point): Point => {
+    const x = point.x - center.x;
+    const y = point.y - center.y;
+    return {
+      x: (x * axisV.y - y * axisV.x) / det,
+      y: (axisU.x * y - axisU.y * x) / det,
+    };
+  };
+  const a = local(start);
+  const b = local(end);
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lengthSquared = dx * dx + dy * dy;
+  const t = lengthSquared > 1e-12
+    ? Math.max(0, Math.min(1, -(a.x * dx + a.y * dy) / lengthSquared))
+    : 0;
+  const closestX = a.x + dx * t;
+  const closestY = a.y + dy * t;
+  return closestX * closestX + closestY * closestY <= 1;
+}
+
 export function hullOverlapsMapping(hull: Point[], mapping: Mapping): boolean {
   if (hull.length === 0) return false;
   for (const point of hull) {
@@ -91,7 +125,20 @@ export function hullOverlapsMapping(hull: Point[], mapping: Mapping): boolean {
   }
   if (isCircleGeometry(mapping)) {
     const center = mapping.vertices[0];
-    return Boolean(center && pointInPolygon(center, hull));
+    const rimU = mapping.vertices[1];
+    const rimV = mapping.vertices[2];
+    if (!center || !rimU || !rimV) return false;
+    if (pointInPolygon(center, hull)) return true;
+    const axisU = { x: rimU.x - center.x, y: rimU.y - center.y };
+    const axisV = { x: rimV.x - center.x, y: rimV.y - center.y };
+    for (let index = 0; index < hull.length; index += 1) {
+      const start = hull[index];
+      const end = hull[(index + 1) % hull.length];
+      if (start && end && segmentIntersectsEllipse(start, end, center, axisU, axisV)) {
+        return true;
+      }
+    }
+    return false;
   }
   for (const point of mapping.vertices) {
     if (pointInPolygon(point, hull)) return true;

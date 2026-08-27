@@ -1,7 +1,8 @@
 import { useEffect } from "react";
-import { asQuad, centroid, lerp, translateVertices } from "../../geometry";
+import { asQuad, centroid, isCircleGeometry, lerp, pointInPolygon, translateVertices } from "../../geometry";
 import {
   clampHullAgainstOccupants,
+  hullHitsOccupants,
   mappingHitAlong,
   occupants,
 } from "../../interact";
@@ -40,10 +41,12 @@ import {
   defaultShipConfig,
   type ShipConfig,
 } from "./config";
-import { useShipPlayStore, type ScreenBullet, type ScreenExhaust } from "./playStore";
+import { idleShipGame, useShipPlayStore, type ScreenBullet, type ScreenEnemy, type ScreenExhaust, type ScreenStar } from "./playStore";
 import { resumeThrustAudio, setThrustRumble, stopThrustRumble } from "./thrustSound";
 import { asConfig } from "../types";
 import { emitSpecialEvent } from "../events";
+import { SOUND_PRESETS, type SoundPresetId } from "../sound/config";
+import { playSoundPreset } from "../sound/player";
 
 type Bounds = { x: number; y: number; width: number; height: number };
 
@@ -99,6 +102,53 @@ type DockMotion = {
   captureArmed: boolean;
 };
 
+type GameEnemy = {
+  id: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  born: number;
+  r: number;
+  burst: Point;
+};
+type ShipGame = {
+  shipId: string;
+  surfaceId: string;
+  phase: "centering" | "hyperspeed" | "playing" | "dying" | "respawning";
+  started: number;
+  stars: Array<Point & { id: number; r: number }>;
+  enemies: GameEnemy[];
+  originals: Map<string, Mapping>;
+  nextSpawn: number;
+  playStarted: number;
+  killCount: number;
+  hyperspeedAcc: number;
+};
+
+const HYPERSPEED_MS = 4400;
+const HYPERSPEED_PEAK_AT = 0.58;
+const ENEMY_POP_MS = 280;
+const ENEMY_LINGER_MS = 820;
+
+function smoothstep(value: number) {
+  const t = Math.max(0, Math.min(1, value));
+  return t * t * (3 - 2 * t);
+}
+
+/** A full travel curve: build speed, briefly reach warp, then coast to rest. */
+function hyperspeedVelocity(progress: number) {
+  if (progress < HYPERSPEED_PEAK_AT) {
+    return smoothstep(progress / HYPERSPEED_PEAK_AT);
+  }
+  return 1 - smoothstep((progress - HYPERSPEED_PEAK_AT) / (1 - HYPERSPEED_PEAK_AT));
+}
+
+/** Stars remain dots at low speed and only stretch once the motion is convincing. */
+function hyperspeedStreak(velocity: number) {
+  return smoothstep((velocity - 0.22) / 0.78);
+}
+
 const LINEAR_STOP = 10;
 const TURN_STOP = 0.08;
 
@@ -115,6 +165,76 @@ const motions = new Map<string, Motion>();
 const charges = new Map<string, number>();
 const exhaustAcc = new Map<string, number>();
 const docks = new Map<string, DockMotion>();
+let game: ShipGame | null = null;
+let nextEnemyId = 1;
+
+function scaleMapping(mapping: Mapping, factor: number): Mapping {
+  const center = mapping.type === "circle" ? mapping.vertices[0] : centroid(mapping.vertices);
+  if (!center) return mapping;
+  return {
+    ...mapping,
+    color: { r: 230, g: 18, b: 26, a: 255 },
+    vertices: mapping.vertices.map((point) => ({
+      x: center.x + (point.x - center.x) * factor,
+      y: center.y + (point.y - center.y) * factor,
+    })),
+  } as Mapping;
+}
+
+function startGame(key: string, now: number): boolean {
+  if (game) return false;
+  const state = useRoomStore.getState();
+  const ships = state.mappings.filter(isShip);
+  const ship = ships.find((item) => {
+    const config = shipConfig(item);
+    return config.minigameEnabled && (config.minigameKey || "g").toLowerCase() === key.toLowerCase();
+  });
+  if (!ship?.surfaceId) return false;
+  const surface = surfaceById(state.surfaces, ship.surfaceId);
+  if (!surface) return false;
+  const basics = state.mappings.filter(
+    (item) => item.surfaceId === ship.surfaceId && (item.type === "polygon" || item.type === "circle"),
+  );
+  const originals = new Map<string, Mapping>([[ship.id, structuredClone(ship)]]);
+  for (const mapping of basics) originals.set(mapping.id, structuredClone(mapping));
+  const { width, height } = wallMetric(surface);
+  const stars: ShipGame["stars"] = [];
+  for (let index = 0; index < 110; index += 1) {
+    stars.push({ x: Math.random() * width, y: -Math.random() * height, id: index, r: 0.6 + Math.random() * 1.25 });
+  }
+  game = {
+    shipId: ship.id,
+    surfaceId: ship.surfaceId,
+    phase: "centering",
+    started: now,
+    stars,
+    enemies: [],
+    originals,
+    nextSpawn: now + 1500,
+    playStarted: 0,
+    killCount: 0,
+    hyperspeedAcc: 0,
+  };
+  // Keep the dock's world-space anchor alive during the minigame. The ship is
+  // detached from it below, but the dock itself must remain where it was set.
+  if (shipConfig(ship).startsDocked && !docks.has(ship.id)) {
+    const center = centroid(ship.vertices);
+    docks.set(ship.id, { center, phase: "docked", started: now, from: center, captureArmed: false });
+  }
+  motions.set(ship.id, { vx: 0, vy: 0, omega: 0 });
+  return true;
+}
+
+function restoreGameMappings(includeShip: boolean) {
+  if (!game) return;
+  const state = useRoomStore.getState();
+  useRoomStore.setState({
+    mappings: state.mappings.map((mapping) => {
+      if (!includeShip && mapping.id === game?.shipId) return mapping;
+      return game?.originals.get(mapping.id) ?? mapping;
+    }),
+  });
+}
 
 function isTypingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
@@ -130,11 +250,23 @@ function heading(angle: number): Point {
   return { x: Math.sin(angle), y: -Math.cos(angle) };
 }
 
+function shortestAngle(from: number, to: number) {
+  return Math.atan2(Math.sin(to - from), Math.cos(to - from));
+}
+
 function shipConfig(mapping: SpecialMapping): ShipConfig {
   const current = asConfig(mapping, defaultShipConfig);
   return {
     angle: Number.isFinite(current.angle) ? current.angle : 0,
     startsDocked: current.startsDocked === true,
+    minigameEnabled: current.minigameEnabled === true,
+    minigameKey: typeof current.minigameKey === "string" ? current.minigameKey : "g",
+    minigameHitSound: SOUND_PRESETS.includes(current.minigameHitSound as SoundPresetId)
+      ? current.minigameHitSound as SoundPresetId
+      : "pop",
+    minigameHitVolume: Number.isFinite(current.minigameHitVolume)
+      ? Math.max(0, Math.min(1, current.minigameHitVolume))
+      : 0.85,
   };
 }
 
@@ -193,13 +325,14 @@ function spawnExhaust(
   local: Point,
   awayY: number,
   now: number,
+  travelScale = 1,
 ) {
   const pos = {
     x: local.x + (Math.random() - 0.5) * 10,
     y: local.y + awayY * Math.random() * 4,
   };
   const startRLocal = EXHAUST_RADIUS + Math.random() * EXHAUST_RADIUS_SPREAD;
-  const speed = EXHAUST_SPEED + Math.random() * EXHAUST_SPEED_SPREAD;
+  const speed = (EXHAUST_SPEED + Math.random() * EXHAUST_SPEED_SPREAD) * travelScale;
   const world = shipLocalToWorld(vertices, angle, pos);
   const vel = localToWorldDelta(vertices, angle, pos, {
     x: (Math.random() - 0.5) * EXHAUST_SPREAD,
@@ -214,7 +347,7 @@ function spawnExhaust(
     vx: vel.x,
     vy: vel.y,
     born: now,
-    life: EXHAUST_LIFE_MS + Math.random() * EXHAUST_LIFE_SPREAD_MS,
+    life: (EXHAUST_LIFE_MS + Math.random() * EXHAUST_LIFE_SPREAD_MS) * Math.min(1.45, 1 + (travelScale - 1) * 0.12),
     startR: Math.hypot(radius.x, radius.y),
   });
   nextExhaustId += 1;
@@ -250,6 +383,152 @@ function insideBounds(point: Point, bounds: Bounds, pad = 0) {
     point.x <= bounds.x + bounds.width + pad &&
     point.y <= bounds.y + bounds.height + pad
   );
+}
+
+function segmentCircleHit(from: Point, to: Point, center: Point, radius: number): number | null {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const fx = from.x - center.x;
+  const fy = from.y - center.y;
+  const a = dx * dx + dy * dy;
+  if (a < 1e-8) return null;
+  const b = 2 * (fx * dx + fy * dy);
+  const c = fx * fx + fy * fy - radius * radius;
+  const discriminant = b * b - 4 * a * c;
+  if (discriminant < 0) return null;
+  const root = Math.sqrt(discriminant);
+  const candidates = [(-b - root) / (2 * a), (-b + root) / (2 * a)].filter((t) => t >= 0 && t <= 1);
+  return candidates.length > 0 ? Math.min(...candidates) : null;
+}
+
+function enemyTouchesHull(enemy: GameEnemy, hull: Point[]): boolean {
+  if (pointInPolygon(enemy, hull)) return true;
+  for (let index = 0; index < hull.length; index += 1) {
+    const a = hull[index];
+    const b = hull[(index + 1) % hull.length];
+    if (!a || !b) continue;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const lengthSquared = dx * dx + dy * dy;
+    const t = lengthSquared > 0
+      ? Math.max(0, Math.min(1, ((enemy.x - a.x) * dx + (enemy.y - a.y) * dy) / lengthSquared))
+      : 0;
+    if (Math.hypot(enemy.x - (a.x + dx * t), enemy.y - (a.y + dy * t)) <= enemy.r) return true;
+  }
+  return false;
+}
+
+function enemyHullAt(point: Point, radius: number): Point[] {
+  const hull: Point[] = [];
+  for (let index = 0; index < 12; index += 1) {
+    const angle = (index / 12) * Math.PI * 2;
+    hull.push({ x: point.x + Math.cos(angle) * radius, y: point.y + Math.sin(angle) * radius });
+  }
+  return hull;
+}
+
+function enemyPositionClear(point: Point, radius: number, obstacles: Mapping[], bounds: Bounds) {
+  if (!insideBounds(point, bounds, radius)) return false;
+  return !hullHitsOccupants(enemyHullAt(point, radius), obstacles);
+}
+
+function moveEnemyConstrained(enemy: GameEnemy, dx: number, dy: number, obstacles: Mapping[], bounds: Bounds) {
+  const distance = Math.hypot(dx, dy);
+  const steps = Math.max(1, Math.ceil(distance / Math.max(2, enemy.r * 0.45)));
+  for (let index = 0; index < steps; index += 1) {
+    const stepX = dx / steps;
+    const stepY = dy / steps;
+    const direct = { x: enemy.x + stepX, y: enemy.y + stepY };
+    if (enemyPositionClear(direct, enemy.r, obstacles, bounds)) {
+      enemy.x = direct.x;
+      enemy.y = direct.y;
+      continue;
+    }
+    const alongX = { x: enemy.x + stepX, y: enemy.y };
+    const alongY = { x: enemy.x, y: enemy.y + stepY };
+    const xClear = enemyPositionClear(alongX, enemy.r, obstacles, bounds);
+    const yClear = enemyPositionClear(alongY, enemy.r, obstacles, bounds);
+    if (xClear && (!yClear || Math.abs(stepX) >= Math.abs(stepY))) enemy.x = alongX.x;
+    else if (yClear) enemy.y = alongY.y;
+    else {
+      enemy.vx *= 0.35;
+      enemy.vy *= 0.35;
+      break;
+    }
+  }
+}
+
+function navigateEnemy(enemy: GameEnemy, target: Point, obstacles: Mapping[], bounds: Bounds, dt: number) {
+  const direct = Math.atan2(target.y - enemy.y, target.x - enemy.x);
+  const current = Math.hypot(enemy.vx, enemy.vy) > 2 ? Math.atan2(enemy.vy, enemy.vx) : direct;
+  const speed = 42;
+  const lookAhead = Math.max(22, speed * 0.65);
+  let bestAngle = current;
+  let bestScore = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < 24; index += 1) {
+    const angle = direct + (index === 0 ? 0 : (index % 2 === 1 ? 1 : -1) * Math.ceil(index / 2) * Math.PI / 12);
+    const probe = { x: enemy.x + Math.cos(angle) * lookAhead, y: enemy.y + Math.sin(angle) * lookAhead };
+    if (!enemyPositionClear(probe, enemy.r, obstacles, bounds)) continue;
+    const distanceScore = Math.hypot(target.x - probe.x, target.y - probe.y);
+    const turnScore = Math.abs(shortestAngle(current, angle)) * 9;
+    const score = distanceScore + turnScore;
+    if (score < bestScore) {
+      bestScore = score;
+      bestAngle = angle;
+    }
+  }
+  enemy.vx = approach(enemy.vx, Math.cos(bestAngle) * speed, 3.8, dt);
+  enemy.vy = approach(enemy.vy, Math.sin(bestAngle) * speed, 3.8, dt);
+  moveEnemyConstrained(enemy, enemy.vx * dt, enemy.vy * dt, obstacles, bounds);
+}
+
+function spawnEnemyAtShape(mapping: Mapping, obstacles: Mapping[], bounds: Bounds, radius: number) {
+  for (let attempt = 0; attempt < 32; attempt += 1) {
+    let edge: Point | null = null;
+    let outward: Point | null = null;
+    if (isCircleGeometry(mapping)) {
+      const center = mapping.vertices[0];
+      const rimU = mapping.vertices[1];
+      const rimV = mapping.vertices[2];
+      if (!center || !rimU || !rimV) return null;
+      const angle = Math.random() * Math.PI * 2;
+      const axisU = { x: rimU.x - center.x, y: rimU.y - center.y };
+      const axisV = { x: rimV.x - center.x, y: rimV.y - center.y };
+      edge = {
+        x: center.x + axisU.x * Math.cos(angle) + axisV.x * Math.sin(angle),
+        y: center.y + axisU.y * Math.cos(angle) + axisV.y * Math.sin(angle),
+      };
+      const radial = { x: edge.x - center.x, y: edge.y - center.y };
+      const length = Math.max(1e-6, Math.hypot(radial.x, radial.y));
+      outward = { x: radial.x / length, y: radial.y / length };
+    } else {
+      const edgeIndex = Math.floor(Math.random() * mapping.vertices.length);
+      const start = mapping.vertices[edgeIndex];
+      const end = mapping.vertices[(edgeIndex + 1) % mapping.vertices.length];
+      if (!start || !end) continue;
+      const along = 0.12 + Math.random() * 0.76;
+      edge = lerp(start, end, along);
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const length = Math.max(1e-6, Math.hypot(dx, dy));
+      const normalA = { x: -dy / length, y: dx / length };
+      const probeA = { x: edge.x + normalA.x * 3, y: edge.y + normalA.y * 3 };
+      outward = pointInPolygon(probeA, mapping.vertices)
+        ? { x: -normalA.x, y: -normalA.y }
+        : normalA;
+    }
+    if (!edge || !outward) continue;
+    // One pixel of breathing room keeps the collision hull outside while the
+    // enemy still appears visually attached to the shape's edge.
+    for (let gap = 1; gap <= 6; gap += 1) {
+      const point = {
+        x: edge.x + outward.x * (radius + gap),
+        y: edge.y + outward.y * (radius + gap),
+      };
+      if (enemyPositionClear(point, radius, obstacles, bounds)) return { point, outward };
+    }
+  }
+  return null;
 }
 
 function chargeOf(id: string): number {
@@ -359,11 +638,66 @@ function publishPlay(now: number, mappings: Mapping[], surfaces: Surface[]) {
       color: mapping.color,
     };
   }
+  let screenGame = idleShipGame;
+  if (game) {
+    const active = byId.get(game.shipId);
+    const surface = surfaceById(surfaces, game.surfaceId);
+    if (active && isShip(active) && surface) {
+      const hyperspeedProgress = game.phase === "hyperspeed"
+        ? Math.min(1, Math.max(0, (now - game.started) / HYPERSPEED_MS))
+        : 1;
+      const starVelocity = game.phase === "hyperspeed" ? hyperspeedVelocity(hyperspeedProgress) : 0;
+      const streak = hyperspeedStreak(starVelocity);
+      const trailLength = streak * 52;
+      const blockers = mappings.filter(
+        (mapping) => mapping.surfaceId === game?.surfaceId && mapping.id !== game?.shipId && !isShip(mapping),
+      );
+      const stars: ScreenStar[] = game.phase === "hyperspeed" || game.phase === "playing" || game.phase === "dying" || game.phase === "respawning"
+        ? game.stars
+            .filter((star) => {
+              const tail = { x: star.x, y: star.y - trailLength };
+              return !mappingHitAlong(blockers, tail, star, 3);
+            })
+            .map((star) => {
+              const point = wallToScreenPoint(surface, star);
+              const tail = wallToScreenPoint(surface, { x: star.x, y: star.y - trailLength });
+              return {
+                id: star.id,
+                x: point.x,
+                y: point.y,
+                r: star.r,
+                length: Math.max(star.r * 2, Math.hypot(point.x - tail.x, point.y - tail.y)),
+                opacity: 0.55 + (star.id % 5) * 0.1,
+              };
+            })
+        : [];
+      const enemies: ScreenEnemy[] = game.enemies.map((enemy) => {
+        const point = wallToScreenPoint(surface, enemy);
+        const edge = wallToScreenPoint(surface, { x: enemy.x + enemy.r, y: enemy.y });
+        return {
+          id: enemy.id,
+          x: point.x,
+          y: point.y,
+          r: Math.max(3, Math.hypot(edge.x - point.x, edge.y - point.y)),
+          opacity: 1,
+        };
+      });
+      screenGame = {
+        activeShipId: game.shipId,
+        hiddenShipIds: mappings.filter(isShip).filter((item) => item.id !== game?.shipId).map((item) => item.id),
+        phase: game.phase,
+        stars,
+        enemies,
+        killCount: game.killCount,
+      };
+    }
+  }
   useShipPlayStore.getState().setPlay({
     bullets: screen,
     charges: nextCharges,
     exhaust: screenExhaust,
     docks: screenDocks,
+    game: screenGame,
   });
 }
 
@@ -375,9 +709,11 @@ function clearPlay() {
   charges.clear();
   exhaustAcc.clear();
   docks.clear();
+  if (game) restoreGameMappings(true);
+  game = null;
   previousDockInput = false;
   setThrustRumble(false);
-  useShipPlayStore.getState().setPlay({ bullets: [], charges: {}, exhaust: [], docks: {} });
+  useShipPlayStore.getState().setPlay({ bullets: [], charges: {}, exhaust: [], docks: {}, game: idleShipGame });
 }
 
 function restoreShipsToDocks() {
@@ -418,6 +754,10 @@ export function useShipRuntime() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (!event.repeat && startGame(event.key, performance.now())) {
+        event.preventDefault();
+        return;
+      }
       if (!applyKey(event, true)) return;
       event.preventDefault();
       if (input.up || input.down) resumeThrustAudio();
@@ -436,7 +776,15 @@ export function useShipRuntime() {
       if (!running) return;
       const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
       last = now;
-      const state = useRoomStore.getState();
+      let state = useRoomStore.getState();
+      if (game?.phase === "dying" && now - game.started >= 480) {
+        restoreGameMappings(true);
+        game.phase = "respawning";
+        game.started = now;
+        state = useRoomStore.getState();
+      } else if (game?.phase === "respawning" && now - game.started >= 760) {
+        game = null;
+      }
       const ships = state.mappings.filter(isShip);
       if (ships.length === 0) {
         if (lasers.length > 0 || exhaust.length > 0) clearPlay();
@@ -463,11 +811,17 @@ export function useShipRuntime() {
       }
 
       for (const ship of ships) {
+        if (game && ship.id !== game.shipId) continue;
         const config = shipConfig(ship);
+        const inGame = game?.shipId === ship.id;
         const bounds = playBounds(ship, state.surfaces);
         const motion = motionOf(ship.id);
         let dock = docks.get(ship.id);
-        if (config.startsDocked && !dock) {
+        if (game?.shipId === ship.id) {
+          // Ignore docking physics for the active game ship without deleting
+          // the persistent dock that publishPlay renders at its fixed anchor.
+          dock = undefined;
+        } else if (config.startsDocked && !dock) {
           const center = centroid(ship.vertices);
           dock = { center, phase: "docked", started: now, from: center, captureArmed: false };
           docks.set(ship.id, dock);
@@ -487,16 +841,26 @@ export function useShipRuntime() {
           dock.started = now;
         }
         let targetOmega = 0;
-        if (input.left) targetOmega -= TURN_SPEED;
-        if (input.right) targetOmega += TURN_SPEED;
+        if (!inGame || game?.phase === "playing") {
+          if (input.left) targetOmega -= TURN_SPEED;
+          if (input.right) targetOmega += TURN_SPEED;
+        }
         motion.omega = approach(motion.omega, targetOmega, TURN_INERTIA, dt);
         if (Math.abs(motion.omega) < TURN_STOP && targetOmega === 0) motion.omega = 0;
-        const angle = config.angle + motion.omega * dt;
+        let angle = config.angle + motion.omega * dt;
+        if (inGame && (game?.phase === "centering" || game?.phase === "hyperspeed")) {
+          const original = game.originals.get(ship.id);
+          const originalAngle = original && isShip(original) ? shipConfig(original).angle : config.angle;
+          const turnT = game.phase === "centering" ? Math.min(1, (now - game.started) / 900) : 1;
+          const easedTurn = 1 - Math.pow(1 - turnT, 3);
+          angle = originalAngle + shortestAngle(originalAngle, 0) * easedTurn;
+          motion.omega = 0;
+        }
         const nose = heading(angle);
 
         let targetVx = 0;
         let targetVy = 0;
-        const canFly = !dock || dock.phase === "free";
+        const canFly = inGame ? game?.phase === "playing" : !dock || dock.phase === "free";
         if (input.up && canFly) {
           targetVx += nose.x * THRUST_SPEED;
           targetVy += nose.y * THRUST_SPEED;
@@ -516,7 +880,7 @@ export function useShipRuntime() {
           motion.vy = 0;
         }
 
-        const firing = input.fire && now - (lastShotAt.get(ship.id) ?? 0) >= FIRE_COOLDOWN_MS;
+        const firing = input.fire && (!inGame || game?.phase === "playing") && now - (lastShotAt.get(ship.id) ?? 0) >= FIRE_COOLDOWN_MS;
         if (!canFly) {
           motion.vx = 0;
           motion.vy = 0;
@@ -525,6 +889,59 @@ export function useShipRuntime() {
         let dx = motion.vx * dt - nose.x * recoil;
         let dy = motion.vy * dt - nose.y * recoil;
         const shipCenter = centroid(ship.vertices);
+        if (inGame && game?.phase === "centering") {
+          const surface = surfaceById(state.surfaces, game.surfaceId);
+          const original = game.originals.get(ship.id);
+          if (surface && original) {
+            const size = wallMetric(surface);
+            const target = { x: size.width / 2, y: size.height / 2 };
+            const start = centroid(original.vertices);
+            const t = Math.min(1, (now - game.started) / 1200);
+            const eased = 1 - Math.pow(1 - t, 3);
+            const next = lerp(start, target, eased);
+            dx = next.x - shipCenter.x;
+            dy = next.y - shipCenter.y;
+            if (t >= 1) {
+              game.phase = "hyperspeed";
+              game.started = now;
+              for (const star of game.stars) {
+                star.x = Math.random() * size.width;
+                star.y = Math.random() * size.height;
+              }
+            }
+          }
+        } else if (inGame && game?.phase === "hyperspeed") {
+          const surface = surfaceById(state.surfaces, game.surfaceId);
+          if (surface) {
+            const size = wallMetric(surface);
+            const target = { x: size.width / 2, y: size.height / 2 };
+            dx = target.x - shipCenter.x;
+            dy = target.y - shipCenter.y;
+            const progress = Math.min(1, (now - game.started) / HYPERSPEED_MS);
+            const velocity = hyperspeedVelocity(progress);
+            const starSpeed = velocity * 880;
+            for (const star of game.stars) {
+              star.y += starSpeed * dt * (0.7 + (star.id % 7) * 0.07);
+              if (star.y > size.height + 50) {
+                star.x = Math.random() * size.width;
+                star.y = -20 - Math.random() * size.height * 0.2;
+              }
+            }
+            if (progress >= 1) {
+              game.phase = "playing";
+              game.started = now;
+              game.playStarted = now;
+              game.nextSpawn = now + 650;
+              mappings = mappings.map((mapping) => {
+                const original = game?.originals.get(mapping.id);
+                return original && (original.type === "polygon" || original.type === "circle")
+                  ? scaleMapping(original, 1.12)
+                  : mapping;
+              });
+              moved = true;
+            }
+          }
+        }
         const distanceFromDock = dock
           ? Math.hypot(shipCenter.x - dock.center.x, shipCenter.y - dock.center.y)
           : Number.POSITIVE_INFINITY;
@@ -556,13 +973,26 @@ export function useShipRuntime() {
             dock.started = now;
           }
         }
-        const hull = shipHull(ship.vertices, angle);
+        const obstacles = inGame
+          ? (game?.phase === "centering" || game?.phase === "hyperspeed" ? [] : occupants(mappings, ship).filter((item) => !isShip(item)))
+          : occupants(mappings, ship);
+        let hull = shipHull(ship.vertices, angle);
+        const previousHull = shipHull(ship.vertices, config.angle);
+        // Rotation changes the hull without translating its mapping vertices.
+        // Reject a colliding pose so the ship cannot turn a wing through an
+        // obstacle while its center remains stationary. Translation still
+        // allows an already-overlapping ship to move out of an obstacle.
+        if (angle !== config.angle && hullHitsOccupants(hull, obstacles)) {
+          angle = config.angle;
+          motion.omega = 0;
+          hull = previousHull;
+        }
         const againstWalls = clampTranslation(hull, dx, dy, bounds);
         const againstMaps = clampHullAgainstOccupants(
           hull,
           againstWalls.dx,
           againstWalls.dy,
-          occupants(mappings, ship),
+          obstacles,
         );
         if (Math.abs(againstMaps.dx - motion.vx * dt) > 0.02) motion.vx = 0;
         if (Math.abs(againstMaps.dy - motion.vy * dt) > 0.02) motion.vy = 0;
@@ -583,22 +1013,118 @@ export function useShipRuntime() {
           moved = true;
         }
 
+        if (inGame && game?.phase === "hyperspeed") {
+          const progress = Math.min(1, (now - game.started) / HYPERSPEED_MS);
+          const velocity = hyperspeedVelocity(progress);
+          let acc = game.hyperspeedAcc + dt * EXHAUST_RATE * (1.2 + velocity * 3.2);
+          while (acc >= 1) {
+            acc -= 1;
+            spawnExhaust(ship.id, vertices, angle, SHIP_THRUSTER, 1, now, 1.35 + velocity * 2.65);
+          }
+          game.hyperspeedAcc = acc;
+        }
+
+        if (inGame && game?.phase === "playing") {
+          const enemyObstacles = mappings.filter(
+            (item) => item.id !== ship.id && item.surfaceId === ship.surfaceId && (item.type === "polygon" || item.type === "circle"),
+          );
+          if (now >= game.nextSpawn && game.enemies.length < 18) {
+            const sources = enemyObstacles;
+            if (sources.length > 0) {
+              const source = sources[Math.floor(Math.random() * sources.length)];
+              if (source) {
+                const spawn = spawnEnemyAtShape(source, enemyObstacles, bounds, 9);
+                if (spawn) {
+                  game.enemies.push({
+                    id: nextEnemyId++,
+                    x: spawn.point.x,
+                    y: spawn.point.y,
+                    vx: spawn.outward.x * 150,
+                    vy: spawn.outward.y * 150,
+                    born: now,
+                    r: 9,
+                    burst: spawn.outward,
+                  });
+                }
+              }
+            }
+            const elapsedSeconds = Math.max(0, (now - game.playStarted) / 1000);
+            const spawnBase = Math.max(230, 1050 - elapsedSeconds * 32);
+            game.nextSpawn = now + spawnBase * (0.82 + Math.random() * 0.36);
+          }
+          const center = centroid(vertices);
+          const movedHull = translateVertices(hull, { x: againstMaps.dx, y: againstMaps.dy });
+          let dead = false;
+          for (const enemy of game.enemies) {
+            const age = now - enemy.born;
+            if (age < ENEMY_POP_MS) {
+              const popEase = 1 - age / ENEMY_POP_MS;
+              enemy.vx = enemy.burst.x * 150 * popEase;
+              enemy.vy = enemy.burst.y * 150 * popEase;
+              moveEnemyConstrained(enemy, enemy.vx * dt, enemy.vy * dt, enemyObstacles, bounds);
+            } else if (age < ENEMY_LINGER_MS) {
+              enemy.vx = approach(enemy.vx, 0, 9, dt);
+              enemy.vy = approach(enemy.vy, 0, 9, dt);
+              moveEnemyConstrained(enemy, enemy.vx * dt, enemy.vy * dt, enemyObstacles, bounds);
+            } else {
+              navigateEnemy(enemy, center, enemyObstacles, bounds, dt);
+            }
+            if (enemyTouchesHull(enemy, movedHull)) dead = true;
+          }
+          if (dead) {
+            game.phase = "dying";
+            game.started = now;
+            game.enemies = [];
+            motion.vx = 0;
+            motion.vy = 0;
+            motion.omega = 0;
+            mappings = mappings.map((mapping) =>
+              mapping.id === ship.id ? mapping : game?.originals.get(mapping.id) ?? mapping,
+            );
+            moved = true;
+          }
+        }
+
         setCharge(
           ship.id,
           approach(chargeOf(ship.id), input.fire ? 1 : 0, input.fire ? CHARGE_IN : CHARGE_OUT, dt),
         );
 
         if (firing) {
+          if (inGame) playSoundPreset("thud", 0.85);
           const muzzle = shipLocalToWorld(vertices, angle, SHIP_NOSE);
           const origin = insideBounds(muzzle, bounds) ? muzzle : centroid(hull);
           const edge = rayExit(origin, nose, bounds);
-          const hit = mappingHitAlong(occupants(mappings, ship), origin, edge, LASER_SAMPLE);
-          if (hit) emitSpecialEvent({ type: "hit", sourceId: ship.id, targetId: hit.mapping.id, point: hit.point });
+          const laserObstacles = game?.shipId === ship.id
+            ? occupants(mappings, ship).filter((item) => !isShip(item))
+            : occupants(mappings, ship);
+          const hit = mappingHitAlong(laserObstacles, origin, edge, LASER_SAMPLE);
+          const mapDistance = hit ? Math.hypot(hit.point.x - origin.x, hit.point.y - origin.y) : Number.POSITIVE_INFINITY;
+          let enemyHit: GameEnemy | null = null;
+          let enemyT = Number.POSITIVE_INFINITY;
+          if (game?.shipId === ship.id && game.phase === "playing") {
+            for (const enemy of game.enemies) {
+              const t = segmentCircleHit(origin, edge, enemy, enemy.r + 2);
+              if (t !== null && t < enemyT) {
+                enemyT = t;
+                enemyHit = enemy;
+              }
+            }
+          }
+          const enemyPoint = enemyHit ? lerp(origin, edge, enemyT) : null;
+          const hitsEnemyFirst = Boolean(enemyHit && enemyPoint && Math.hypot(enemyPoint.x - origin.x, enemyPoint.y - origin.y) < mapDistance);
+          if (hitsEnemyFirst && enemyHit && game) {
+            game.enemies = game.enemies.filter((enemy) => enemy.id !== enemyHit?.id);
+            game.killCount += 1;
+            playSoundPreset(config.minigameHitSound, config.minigameHitVolume);
+          } else if (hit) {
+            emitSpecialEvent({ type: "hit", sourceId: ship.id, targetId: hit.mapping.id, point: hit.point });
+          }
           lasers.push({
             id: nextLaserId,
             mappingId: ship.id,
             from: origin,
-            to: hit?.point ?? edge,
+            to: hitsEnemyFirst && enemyPoint ? enemyPoint : hit?.point ?? edge,
             born: now,
           });
           nextLaserId += 1;
@@ -632,7 +1158,9 @@ export function useShipRuntime() {
       if (exhaust.length > MAX_EXHAUST) exhaust = exhaust.slice(exhaust.length - MAX_EXHAUST);
 
       if (moved) useRoomStore.setState({ mappings });
-      const anyFreeShip = ships.some((ship) => !docks.get(ship.id) || docks.get(ship.id)?.phase === "free");
+      const anyFreeShip = ships.some(
+        (ship) => game?.shipId === ship.id || !docks.get(ship.id) || docks.get(ship.id)?.phase === "free",
+      );
       setThrustRumble(anyFreeShip && (input.up || input.down));
       publishPlay(now, mappings, state.surfaces);
 

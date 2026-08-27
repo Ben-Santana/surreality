@@ -14,7 +14,7 @@ import { definitionConfig } from "../specials/types";
 import { useRoomStore } from "../store";
 import { DEFAULT_TEXT_FONT, TEXT_FONTS } from "../textFonts";
 import { displayVertices } from "../wall";
-import type { SpecialMapping } from "../types";
+import type { SpecialMapping, TextMapping } from "../types";
 import ColorPicker from "./ColorPicker";
 
 export default function Inspector() {
@@ -107,14 +107,22 @@ export default function Inspector() {
 
       {selected.type === "text" ? (
         <div className="space-y-3">
-          <label className="block space-y-1.5">
+          <div className="grid grid-cols-2 gap-1.5">
+            {(["text", "clock"] as const).map((mode) => (
+              <button key={mode} type="button" onClick={() => updateMapping(selected.id, { contentMode: mode })}
+                className={`h-9 border text-[12px] uppercase tracking-wider ${(selected.contentMode ?? "text") === mode ? "border-accent bg-accent/15 text-white" : "border-white/10 text-white/50"}`}>
+                {mode}
+              </button>
+            ))}
+          </div>
+          {(selected.contentMode ?? "text") === "text" ? <label className="block space-y-1.5">
             <span className="chrome-label">Text</span>
             <input
               value={selected.text}
               onChange={(event) => updateMapping(selected.id, { text: event.target.value })}
               className="panel-field no-drag h-9 w-full rounded-none px-3 text-[13px] outline-none"
             />
-          </label>
+          </label> : <ClockControls mapping={selected} />}
           <div className="space-y-1.5">
             <span className="chrome-label">Typeface</span>
             <div className="grid grid-cols-2 gap-1.5">
@@ -221,6 +229,49 @@ function SpecialInspector({ mapping }: { mapping: SpecialMapping }) {
         })
       }
     />
+  );
+}
+
+function ClockControls({ mapping }: { mapping: TextMapping }) {
+  const updateMapping = useRoomStore((state) => state.updateMapping);
+  const patch = (value: Partial<TextMapping>) => updateMapping(mapping.id, value);
+  const analog = (mapping.clockStyle ?? "digital") === "analog";
+  return (
+    <div className="space-y-3 border border-white/10 bg-white/[0.025] p-3">
+      <div className="grid grid-cols-2 gap-1.5">
+        {(["digital", "analog"] as const).map((style) => (
+          <button key={style} type="button" onClick={() => patch({ clockStyle: style })}
+            className={`h-9 border text-[11px] uppercase tracking-[0.14em] ${(mapping.clockStyle ?? "digital") === style ? "border-accent/70 bg-accent/15 text-white" : "border-white/10 text-white/50 hover:text-white"}`}>
+            {style}
+          </button>
+        ))}
+      </div>
+      {analog ? (
+        <label className="block space-y-1.5">
+          <span className="chrome-label">Face</span>
+          <select value={mapping.clockFaceStyle ?? "ticks"} onChange={(event) => patch({ clockFaceStyle: event.target.value as TextMapping["clockFaceStyle"] })}
+            className="panel-field no-drag h-9 w-full px-2 text-[12px] outline-none">
+            <option value="minimal">Minimal</option><option value="ticks">Precision ticks</option><option value="numerals">Numerals</option>
+          </select>
+        </label>
+      ) : (
+        <Toggle label="24-hour time" checked={mapping.clock24Hour ?? false} onChange={(clock24Hour) => patch({ clock24Hour })} />
+      )}
+      <Toggle label="Show seconds" checked={mapping.clockShowSeconds !== false} onChange={(clockShowSeconds) => patch({ clockShowSeconds })} />
+      {!analog ? <Toggle label="Show date" checked={mapping.clockShowDate ?? false} onChange={(clockShowDate) => patch({ clockShowDate })} /> : null}
+      <Toggle label="Background" checked={mapping.clockShowBackground !== false} onChange={(clockShowBackground) => patch({ clockShowBackground })} />
+      <Toggle label="Soft glow" checked={mapping.clockGlow ?? false} onChange={(clockGlow) => patch({ clockGlow })} />
+      <p className="text-[10px] leading-relaxed text-white/35">Uses this computer&apos;s local time. Color becomes the face color when the background is off.</p>
+    </div>
+  );
+}
+
+function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <label className="flex cursor-pointer items-center justify-between py-0.5 text-[12px] text-white/65">
+      <span>{label}</span>
+      <input className="accent-[var(--color-accent)]" type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+    </label>
   );
 }
 

@@ -4,6 +4,7 @@ import {
   Frame,
   Grid3x3,
   Magnet,
+  ImagePlay,
   Monitor,
   MousePointer2,
   Pentagon,
@@ -15,7 +16,7 @@ import {
   Undo2,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { listSpecials } from "../specials/registry";
+import { listSpecialMappingChoices } from "../specials/registry";
 import { useRoomStore } from "../store";
 import type { DisplayInfo, GridSize, Tool } from "../types";
 import Flyout, { eventInside } from "./Flyout";
@@ -59,7 +60,7 @@ export default function Toolbar() {
   const [menu, setMenu] = useState<MenuId | null>(null);
   const [specialOpen, setSpecialOpen] = useState(false);
   const [specialSide, setSpecialSide] = useState<"left" | "right">("right");
-  const specials = listSpecials();
+  const specials = listSpecialMappingChoices();
   const addRef = useRef<HTMLDivElement>(null);
   const addMenuRef = useRef<HTMLDivElement>(null);
   const specialRowRef = useRef<HTMLDivElement>(null);
@@ -180,6 +181,23 @@ export default function Toolbar() {
                 <span className="font-mono text-[10px] text-white/35">{item.shortcut}</span>
               </button>
             ))}
+            <button
+              type="button"
+              title="Media (M)"
+              className={`flex h-8 w-full items-center gap-2 rounded-none px-2 text-left text-[13px] hover:bg-white/10 ${
+                tool === "special" && specialKind === "media" && editMode
+                  ? "bg-accent/15 text-accent"
+                  : "text-white"
+              }`}
+              onClick={() => {
+                setSpecialKind("media");
+                closeMenus();
+              }}
+            >
+              <ImagePlay className="size-4 opacity-80" />
+              <span className="flex-1">Media</span>
+              <span className="font-mono text-[10px] text-white/35">M</span>
+            </button>
             <div
               ref={specialRowRef}
               onMouseEnter={openSpecial}

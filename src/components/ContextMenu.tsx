@@ -5,6 +5,7 @@ import {
   ChevronsUp,
   Circle,
   Frame,
+  ImagePlay,
   Palette,
   Pentagon,
   Plus,
@@ -13,7 +14,7 @@ import {
   Type,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { listSpecials } from "../specials/registry";
+import { listSpecialMappingChoices } from "../specials/registry";
 import { useRoomStore } from "../store";
 import ColorPicker from "./ColorPicker";
 import { isPolygonGeometry } from "../geometry";
@@ -42,7 +43,7 @@ export default function ContextMenu() {
   const surfaces = useRoomStore((state) => state.surfaces);
   const closeMenu = useRoomStore((state) => state.closeMenu);
   const setColorMode = useRoomStore((state) => state.setColorMode);
-  const addPolygon = useRoomStore((state) => state.addPolygon);
+  const setTool = useRoomStore((state) => state.setTool);
   const addCircle = useRoomStore((state) => state.addCircle);
   const addText = useRoomStore((state) => state.addText);
   const addSurface = useRoomStore((state) => state.addSurface);
@@ -83,7 +84,7 @@ export default function ContextMenu() {
         {
           label: "Add polygon",
           icon: <Pentagon className="size-4" />,
-          action: () => addPolygon(at),
+          action: () => setTool("polygon"),
         },
         {
           label: "Add circle",
@@ -96,9 +97,14 @@ export default function ContextMenu() {
           action: () => addText(at),
         },
         {
+          label: "Add media",
+          icon: <ImagePlay className="size-4" />,
+          action: () => addSpecial("media", at),
+        },
+        {
           label: "Add special",
           icon: <Sparkles className="size-4" />,
-          children: listSpecials().map((item) => ({
+          children: listSpecialMappingChoices().map((item) => ({
             label: item.label,
             icon: <Sparkles className="size-4" />,
             action: () => addSpecial(item.kind, at),
@@ -155,7 +161,6 @@ export default function ContextMenu() {
     return list;
   }, [
     addCircle,
-    addPolygon,
     addSpecial,
     addSurface,
     addText,
@@ -168,6 +173,7 @@ export default function ContextMenu() {
     menu,
     sendToBack,
     sendToFront,
+    setTool,
     setColorMode,
     surface,
   ]);

@@ -1,13 +1,22 @@
 import type { Point } from "../../types";
+import type { SoundPresetId } from "../sound/config";
 
 export type ShipConfig = {
   angle: number;
   startsDocked: boolean;
+  minigameEnabled: boolean;
+  minigameKey: string;
+  minigameHitSound: SoundPresetId;
+  minigameHitVolume: number;
 };
 
 export const defaultShipConfig: ShipConfig = {
   angle: 0,
   startsDocked: false,
+  minigameEnabled: false,
+  minigameKey: "g",
+  minigameHitSound: "pop",
+  minigameHitVolume: 0.85,
 };
 
 export const SHIP_CONTENT_SIZE = { width: 96, height: 96 };

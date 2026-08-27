@@ -1,6 +1,8 @@
 import { feynmanSpecial } from "./feynman/definition";
 import { shipSpecial } from "./ship/definition";
 import { soundSpecial } from "./sound/definition";
+import { mediaSpecial } from "./media/definition";
+import { ditheredMediaSpecial } from "./dithered-media/definition";
 import { definitionConfig } from "./types";
 import type { SpecialDefinition } from "./types";
 import type { SpecialMapping } from "../types";
@@ -19,6 +21,8 @@ export function registerSpecial<C>(definition: SpecialDefinition<C>): SpecialDef
  * folder next to `feynman/` and pass it through `registerSpecial`.
  */
 export const specials: SpecialDefinition[] = [
+  registerSpecial(mediaSpecial),
+  registerSpecial(ditheredMediaSpecial),
   registerSpecial(feynmanSpecial),
   registerSpecial(soundSpecial),
   registerSpecial(shipSpecial),
@@ -30,6 +34,11 @@ export function getSpecial(kind: string): SpecialDefinition | undefined {
 
 export function listSpecials(): SpecialDefinition[] {
   return specials;
+}
+
+/** Definitions presented in the UI as special-purpose mappings. */
+export function listSpecialMappingChoices(): SpecialDefinition[] {
+  return specials.filter((item) => item.kind !== "media");
 }
 
 export function activateSpecial(mapping: SpecialMapping): boolean {
