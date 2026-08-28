@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { BrowserWindow as ElectronWindow, MessageBoxOptions, OpenDialogOptions } from "electron";
 import { inspectCustomMappingArchive, installCustomMappingArchive, listInstalledCustomMappings, registerCustomMappingProtocol, seedBundledCustomMappings, uninstallCustomMapping } from "./customMappings";
+import { startPackagePlugins, stopPackagePlugins } from "./plugins";
 
 const { app, BrowserWindow, dialog, ipcMain, Menu, protocol, screen } = createRequire(import.meta.url)(
   "electron",
@@ -213,6 +214,10 @@ app.whenReady().then(() => {
   installMenu();
   registerCustomMappingProtocol(app, protocol);
   createEditor();
+  const refreshPlugins = () => startPackagePlugins(app, listInstalledCustomMappings(app), (payload) => {
+    for (const window of BrowserWindow.getAllWindows()) window.webContents.send("plugin:data", payload);
+  });
+  refreshPlugins();
 
   ipcMain.handle("displays", () =>
     screen.getAllDisplays().map((display) => ({
@@ -240,7 +245,10 @@ app.whenReady().then(() => {
     const options: OpenDialogOptions = {
       title: "Import Custom Mapping",
       properties: ["openFile"],
-      filters: [{ name: "Surreality Mapping", extensions: ["mapping"] }],
+      filters: [
+        { name: "Surreality Package", extensions: ["surreality"] },
+        { name: "Legacy Surreality Mapping", extensions: ["mapping"] },
+      ],
     };
     const result = editorWindow
       ? await dialog.showOpenDialog(editorWindow, options)
@@ -249,11 +257,14 @@ app.whenReady().then(() => {
     if (result.canceled || !archivePath) return { canceled: true };
     const manifest = inspectCustomMappingArchive(archivePath);
     const permissions = manifest.permissions?.length ? manifest.permissions.join("\n• ") : "No optional capabilities";
+    const nativePlugin = Boolean(manifest.entrypoints.plugin);
     const confirmationOptions: MessageBoxOptions = {
       type: "warning",
-      title: "Install code-powered mapping?",
+      title: nativePlugin ? "Install privileged Surreality plugin?" : "Install Surreality package?",
       message: `Install ${manifest.name} ${manifest.version}?`,
-      detail: `This package contains executable code. Only install it if you trust ${manifest.author?.name ?? "its publisher"}.\n\nRequested capabilities:\n• ${permissions}\n\nMapping code runs in a restricted browser sandbox, but may still display misleading content or misuse granted capabilities.`,
+      detail: nativePlugin
+        ? `This package contains native plugin code. Only install it if you trust ${manifest.author?.name ?? "its publisher"}.\n\nRequested capabilities:\n• ${permissions}\n\nIts plugin process has the same operating-system access as Surreality. It can read files, use devices, access the network, and run programs.`
+        : `This package contains executable browser code. Only install it if you trust ${manifest.author?.name ?? "its publisher"}.\n\nRequested capabilities:\n• ${permissions}\n\nIts mapping code runs in a restricted browser sandbox.`,
       buttons: ["Cancel", "Install"],
       defaultId: 0,
       cancelId: 0,
@@ -264,6 +275,7 @@ app.whenReady().then(() => {
       : await dialog.showMessageBox(confirmationOptions);
     if (confirmation.response !== 1) return { canceled: true };
     const installed = installCustomMappingArchive(app, archivePath);
+    refreshPlugins();
     for (const window of BrowserWindow.getAllWindows()) window.webContents.send("custom-mappings:changed");
     return { canceled: false, installed };
   });
@@ -289,6 +301,7 @@ app.whenReady().then(() => {
     if (confirmation.response !== 1) return { removed: false };
     const removed = uninstallCustomMapping(app, packageId, packageVersion);
     if (removed) {
+      refreshPlugins();
       for (const window of BrowserWindow.getAllWindows()) window.webContents.send("custom-mappings:changed");
     }
     return { removed };
@@ -313,6 +326,8 @@ app.whenReady().then(() => {
     }
   });
 });
+
+app.on("before-quit", stopPackagePlugins);
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {

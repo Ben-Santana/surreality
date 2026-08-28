@@ -30,7 +30,7 @@ test("packer creates an importable mapping archive", () => {
   const create = spawnSync(process.execPath, [path.resolve("scripts/create-mapping.mjs"), "packed"], { cwd: project, encoding: "utf8" });
   assert.equal(create.status, 0, create.stderr);
   const source = path.join(project, "custom-mappings/packed");
-  const output = path.join(project, "packed.mapping");
+  const output = path.join(project, "packed.surreality");
   const pack = spawnSync(process.execPath, [path.resolve("scripts/pack-mapping.mjs"), source, output], { cwd: project, encoding: "utf8" });
   assert.equal(pack.status, 0, pack.stderr);
   const archive = JSON.parse(fs.readFileSync(output, "utf8"));
@@ -43,7 +43,7 @@ test("installer validates, extracts, and lists a package", () => {
   const project = fs.mkdtempSync(path.join(os.tmpdir(), "surreality-installer-"));
   const source = path.join(project, "custom-mappings/installed");
   assert.equal(spawnSync(process.execPath, [path.resolve("scripts/create-mapping.mjs"), "installed"], { cwd: project }).status, 0);
-  const archivePath = path.join(project, "installed.mapping");
+  const archivePath = path.join(project, "installed.surreality");
   assert.equal(spawnSync(process.execPath, [path.resolve("scripts/pack-mapping.mjs"), source, archivePath], { cwd: project }).status, 0);
   const userData = path.join(project, "user-data");
   const moduleUrl = pathToFileURL(path.resolve("electron/customMappings.ts")).href;
@@ -73,18 +73,18 @@ test("installer validates, extracts, and lists a package", () => {
   assert.ok(!fs.existsSync(path.join(userData, "custom-mappings/local.installed/1.0.0")));
 });
 
-test("current mappings are distributed as reinstallable .mapping files", () => {
-  const files = fs.readdirSync(path.resolve("mappings")).filter((name) => name.endsWith(".mapping")).sort();
+test("current mappings are distributed as reinstallable .surreality files", () => {
+  const files = fs.readdirSync(path.resolve("mappings")).filter((name) => name.endsWith(".surreality")).sort();
   assert.deepEqual(files, [
-    "room.mapping.dithered-media-1.0.0.mapping",
-    "room.mapping.feynman-1.0.0.mapping",
-    "room.mapping.media-1.0.0.mapping",
-    "room.mapping.ship-1.0.0.mapping",
-    "room.mapping.sound-1.0.0.mapping",
+    "room.mapping.dithered-media-1.0.0.surreality",
+    "room.mapping.feynman-1.0.0.surreality",
+    "room.mapping.media-1.0.0.surreality",
+    "room.mapping.ship-1.0.0.surreality",
+    "room.mapping.sound-1.0.0.surreality",
   ]);
   for (const file of files) {
     const archive = JSON.parse(fs.readFileSync(path.resolve("mappings", file), "utf8"));
-    assert.equal(archive.manifest.manifestVersion, 1);
+    assert.equal(archive.manifest.manifestVersion, 2);
     assert.ok(archive.files[archive.manifest.entrypoints.mapping]);
   }
 });

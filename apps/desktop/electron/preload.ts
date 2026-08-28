@@ -43,6 +43,11 @@ contextBridge.exposeInMainWorld("room", {
     ipcRenderer.on("custom-mappings:changed", handler);
     return () => ipcRenderer.removeListener("custom-mappings:changed", handler);
   },
+  onPluginData: (callback: (payload: unknown) => void) => {
+    const handler = (_event: unknown, payload: unknown) => callback(payload);
+    ipcRenderer.on("plugin:data", handler);
+    return () => ipcRenderer.removeListener("plugin:data", handler);
+  },
   sync: (payload: unknown) => ipcRenderer.send("sync", payload),
   onSync: (callback: (payload: unknown) => void) => {
     const handler = (_event: unknown, payload: unknown) => callback(payload);

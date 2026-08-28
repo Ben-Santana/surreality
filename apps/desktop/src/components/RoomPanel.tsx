@@ -7,7 +7,6 @@ import Toolbar from "./Toolbar";
 export default function RoomPanel({ detached = false }: { detached?: boolean }) {
   const detach = () => {
     if (detached) return;
-    document.documentElement.classList.add("controls-detached");
     const panel = document.querySelector<HTMLElement>(".embedded-room-panel");
     const rect = panel?.getBoundingClientRect();
     const url = new URL(window.location.href);
@@ -17,10 +16,10 @@ export default function RoomPanel({ detached = false }: { detached?: boolean }) 
       "room-controls",
       `popup,width=${Math.round(rect?.width ?? 760)},height=${Math.round(rect?.height ?? 720)},resizable=yes,left=${Math.round(window.screenX + (rect?.left ?? 0))},top=${Math.round(window.screenY + (rect?.top ?? 0))}`,
     );
+    if (!popup) return;
+    document.documentElement.classList.add("controls-detached");
     window.dispatchEvent(new CustomEvent("controls-window-opened", { detail: popup }));
-    if (popup) {
-      popup.focus();
-    }
+    popup.focus();
   };
 
   return (

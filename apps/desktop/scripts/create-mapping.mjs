@@ -15,7 +15,7 @@ if (!slug) {
   } else {
     fs.mkdirSync(directory, { recursive: true });
     const manifest = {
-      manifestVersion: 1,
+      manifestVersion: 2,
       id: `local.${slug}`,
       name: title,
       version: "1.0.0",

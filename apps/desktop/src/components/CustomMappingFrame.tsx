@@ -109,6 +109,15 @@ export default function CustomMappingFrame({ mapping, manifest, mode, onConfigCh
     }, "*");
   }), [mapping.id]);
 
+  useEffect(() => window.room?.onPluginData((message) => {
+    ref.current?.contentWindow?.postMessage({
+      source: "surreality-host",
+      type: "plugin-data",
+      channel: `${message.packageId}/${message.channel}`,
+      data: message.data,
+    }, "*");
+  }), []);
+
   useEffect(() => {
     const ownsRuntime = Boolean(manifest.entrypoints.runtime);
     const receivesInput = mode === "runtime" || (mode === "mapping" && !ownsRuntime);

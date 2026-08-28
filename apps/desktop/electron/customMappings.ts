@@ -25,6 +25,15 @@ const PERMISSIONS = new Set<CustomMappingPermission>([
   "network:fetch",
   "storage:package",
   "files:user-selected",
+  "device:usb",
+  "device:serial",
+  "device:camera",
+  "device:midi",
+  "network:listen",
+  "process:spawn",
+  "background:run",
+  "events:publish",
+  "system:unrestricted",
 ]);
 
 function packagesRoot(app: App) {
@@ -58,7 +67,7 @@ function positiveSize(value: unknown, name: string) {
 
 export function validateManifest(value: unknown): CustomMappingPackageManifest {
   if (!isRecord(value)) throw new Error("manifest must be an object");
-  if (value.manifestVersion !== 1) throw new Error("Unsupported manifestVersion");
+  if (value.manifestVersion !== 1 && value.manifestVersion !== 2) throw new Error("Unsupported manifestVersion");
   if (typeof value.id !== "string" || !PACKAGE_ID.test(value.id)) throw new Error("Invalid package id");
   if (typeof value.version !== "string" || !VERSION.test(value.version)) throw new Error("Invalid package version");
   if (typeof value.name !== "string" || !value.name.trim() || value.name.length > 80) throw new Error("Invalid package name");
@@ -76,6 +85,7 @@ export function validateManifest(value: unknown): CustomMappingPackageManifest {
     mapping: safeRelativePath(value.entrypoints.mapping),
     ...(value.entrypoints.inspector ? { inspector: safeRelativePath(value.entrypoints.inspector) } : {}),
     ...(value.entrypoints.runtime ? { runtime: safeRelativePath(value.entrypoints.runtime) } : {}),
+    ...(value.entrypoints.plugin ? { plugin: safeRelativePath(value.entrypoints.plugin) } : {}),
   };
   const permissions = Array.isArray(value.permissions) ? value.permissions : [];
   if (!permissions.every((permission): permission is CustomMappingPermission => typeof permission === "string" && PERMISSIONS.has(permission as CustomMappingPermission))) {
@@ -84,8 +94,12 @@ export function validateManifest(value: unknown): CustomMappingPackageManifest {
   const author = isRecord(value.author) && typeof value.author.name === "string"
     ? { name: value.author.name, ...(typeof value.author.url === "string" ? { url: value.author.url } : {}) }
     : undefined;
+  if (entrypoints.plugin && value.manifestVersion !== 2) throw new Error("Plugin entrypoints require manifestVersion 2");
+  if (entrypoints.plugin && !permissions.includes("system:unrestricted")) {
+    throw new Error("Native plugin entrypoints require system:unrestricted");
+  }
   return {
-    manifestVersion: 1,
+    manifestVersion: value.manifestVersion,
     id: value.id,
     name: value.name.trim(),
     version: value.version,
@@ -123,10 +137,10 @@ export function seedBundledCustomMappings(app: App, archiveDirectory: string) {
   const marker = path.join(root, ".bundled-mappings-seeded-v1");
   if (!fs.existsSync(archiveDirectory)) return;
   fs.mkdirSync(root, { recursive: true });
-  const coreMediaArchive = path.join(archiveDirectory, `${CORE_MEDIA_PACKAGE_ID}-1.0.0.mapping`);
-  if (fs.existsSync(coreMediaArchive)) installCustomMappingArchive(app, coreMediaArchive);
+  const coreMediaArchive = ["surreality", "mapping"].map((extension) => path.join(archiveDirectory, `${CORE_MEDIA_PACKAGE_ID}-1.0.0.${extension}`)).find(fs.existsSync);
+  if (coreMediaArchive) installCustomMappingArchive(app, coreMediaArchive);
   if (fs.existsSync(marker)) return;
-  for (const name of fs.readdirSync(archiveDirectory).filter((item) => item.endsWith(".mapping")).sort()) {
+  for (const name of fs.readdirSync(archiveDirectory).filter((item) => item.endsWith(".surreality") || item.endsWith(".mapping")).sort()) {
     installCustomMappingArchive(app, path.join(archiveDirectory, name));
   }
   fs.writeFileSync(marker, "1\n", { flag: "wx" });
@@ -227,6 +241,7 @@ function hostHtml(manifest: CustomMappingPackageManifest, mode: "mapping" | "ins
 const root = document.getElementById("root");
 let current = null;
 let api = null;
+const inputSubscribers = new Map();
 const send = (type, payload = {}) => parent.postMessage({ source: "surreality-mapping", type, ...payload }, "*");
 try {
   const module = await import(${JSON.stringify(`./${entry}`)});
@@ -249,6 +264,11 @@ addEventListener("message", async (event) => {
     if (typeof handler === "function") await handler(message.input);
     return;
   }
+  if (message.type === "plugin-data") {
+    const listeners = inputSubscribers.get(message.channel);
+    if (listeners) for (const listener of [...listeners]) await listener(message.data);
+    return;
+  }
   if ((message.type !== "initialize" && message.type !== "update") || !api) return;
   if (message.type === "update" && message.mode === "inspector") return;
   try {
@@ -266,6 +286,15 @@ addEventListener("message", async (event) => {
       assets: { url: (relativePath) => new URL(relativePath, location.href).href },
       updateConfig: (config) => send("update-config", { config }),
       emit: (mappingEvent) => send("emit-event", { event: mappingEvent }),
+      inputs: {
+        subscribe: (channel, listener) => {
+          if (typeof channel !== "string" || typeof listener !== "function") throw new Error("inputs.subscribe requires a channel and callback");
+          const listeners = inputSubscribers.get(channel) ?? new Set();
+          listeners.add(listener);
+          inputSubscribers.set(channel, listeners);
+          return () => listeners.delete(listener);
+        },
+      },
       log: (...parts) => send("log", { level: "log", message: parts.map(String).join(" ") }),
     };
     const mount = typeof api === "function" ? api : api.mount ?? api.mountMapping ?? api.mountInspector;

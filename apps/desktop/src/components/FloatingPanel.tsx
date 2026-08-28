@@ -83,7 +83,7 @@ export default function FloatingPanel({
   children,
   onDetach,
 }: {
-  title?: string;
+  title?: ReactNode;
   accessory?: ReactNode;
   className?: string;
   children: ReactNode;
@@ -171,7 +171,7 @@ export default function FloatingPanel({
           <span className="flex h-9 items-center px-2 text-white/40">
             <GripVertical className="size-3.5" />
           </span>
-          {title ? <p className="chrome-label pr-3">{title}</p> : null}
+          {title ? <div className="pr-3">{title}</div> : null}
           {accessory ? <div className="ml-auto pr-3">{accessory}</div> : null}
         </div>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>

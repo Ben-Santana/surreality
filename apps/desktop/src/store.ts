@@ -120,7 +120,9 @@ type RoomState = {
   saveActiveSpace: (name?: string) => void;
   saveSpaceAs: (name: string) => void;
   loadSpace: (id: string) => void;
+  renameSpace: (id: string, name: string) => void;
   deleteSpace: (id: string) => void;
+  returnToSpacePicker: () => void;
   undo: () => void;
   redo: () => void;
   endHistoryGesture: () => void;
@@ -814,6 +816,18 @@ export const useRoomStore = create<RoomState>()(
           ...emptyHistory(),
         });
       },
+      renameSpace: (id, name) => {
+        const { spaces } = get();
+        const current = spaces.find((space) => space.id === id);
+        const trimmed = name.trim();
+        if (!current || !trimmed) return;
+        const nextName = uniqueSpaceName(spaces, trimmed, id);
+        set({
+          spaces: spaces.map((space) =>
+            space.id === id ? { ...space, name: nextName, updatedAt: Date.now() } : space,
+          ),
+        });
+      },
       deleteSpace: (id) => {
         const { spaces, activeSpaceId, mappings, surfaces } = get();
         const flushed = flushUntitled(spaces, activeSpaceId, mappings, surfaces);
@@ -834,6 +848,28 @@ export const useRoomStore = create<RoomState>()(
           return;
         }
         set({ spaces: remaining });
+      },
+      returnToSpacePicker: () => {
+        const { spaces, activeSpaceId, mappings, surfaces } = get();
+        const active = spaces.find((space) => space.id === activeSpaceId);
+        set({
+          spaces: active
+            ? spaces.map((space) =>
+                space.id === active.id
+                  ? {
+                      ...space,
+                      mappings: cloneMappings(mappings),
+                      surfaces: cloneSurfaces(surfaces),
+                      updatedAt: Date.now(),
+                    }
+                  : space,
+              )
+            : spaces,
+          spaceEntered: false,
+          selectedId: null,
+          contextMenu: null,
+          spaceNamePrompt: null,
+        });
       },
       undo: () => {
         const state = get();

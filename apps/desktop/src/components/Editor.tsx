@@ -1,5 +1,6 @@
+import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useRoomStore } from "../store";
+import { spaceLabel, useRoomStore } from "../store";
 import ContextMenu from "./ContextMenu";
 import FloatingPanel from "./FloatingPanel";
 import RoomPanel from "./RoomPanel";
@@ -17,6 +18,8 @@ function isTypingTarget(target: EventTarget | null) {
 export default function Editor() {
   const [controlsDetached, setControlsDetached] = useState(false);
   const mappings = useRoomStore((state) => state.mappings);
+  const spaces = useRoomStore((state) => state.spaces);
+  const activeSpaceId = useRoomStore((state) => state.activeSpaceId);
   const editMode = useRoomStore((state) => state.editMode);
   const contextMenu = useRoomStore((state) => state.contextMenu);
   const spaceEntered = useRoomStore((state) => state.spaceEntered);
@@ -28,11 +31,12 @@ export default function Editor() {
   const toggleGrid = useRoomStore((state) => state.toggleGrid);
   const select = useRoomStore((state) => state.select);
   const requestSave = useRoomStore((state) => state.requestSave);
+  const returnToSpacePicker = useRoomStore((state) => state.returnToSpacePicker);
   const undo = useRoomStore((state) => state.undo);
   const redo = useRoomStore((state) => state.redo);
+  const activeSpace = spaces.find((space) => space.id === activeSpaceId);
 
   const detachControls = (bounds?: { x: number; y: number; width: number; height: number }) => {
-    document.documentElement.classList.add("controls-detached");
     const url = new URL(window.location.href);
     url.search = "?mode=controls";
     const placement = bounds
@@ -43,8 +47,10 @@ export default function Editor() {
       "room-controls",
       `popup,width=${bounds?.width ?? 760},height=${bounds?.height ?? 720},resizable=yes${placement}`,
     );
+    if (!popup) return;
+    document.documentElement.classList.add("controls-detached");
     window.dispatchEvent(new CustomEvent("controls-window-opened", { detail: popup }));
-    popup?.focus();
+    popup.focus();
   };
 
   useEffect(() => {
@@ -70,7 +76,7 @@ export default function Editor() {
         type?: string;
         bounds?: { x: number; y: number; width: number; height: number };
       } | null;
-      if (message?.type !== "room-controls-closed") return;
+      if (message?.type !== "room-controls-closed" && message?.type !== "room-controls-show-spaces") return;
       const bounds = message.bounds;
       if (bounds) {
         const x = bounds.x - window.screenX;
@@ -87,6 +93,9 @@ export default function Editor() {
       popup = null;
       document.documentElement.classList.remove("controls-detached");
       setControlsDetached(false);
+      if (message.type === "room-controls-show-spaces") {
+        useRoomStore.getState().returnToSpacePicker();
+      }
     };
     window.addEventListener("controls-window-opened", opened);
     window.addEventListener("message", closed);
@@ -210,7 +219,24 @@ export default function Editor() {
       <Stage />
       {spaceEntered && editMode && !controlsDetached ? (
         <FloatingPanel
-          title="Room"
+          title={
+            <button
+              type="button"
+              title="Back to all spaces"
+              aria-label={`Back to all spaces from ${spaceLabel(activeSpace)}`}
+              className="group no-drag relative block h-4 min-w-[132px] max-w-52 overflow-hidden text-left outline-none focus-visible:ring-1 focus-visible:ring-accent/70"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={returnToSpacePicker}
+            >
+              <span className="chrome-label block truncate leading-4 transition-transform duration-200 ease-out group-hover:-translate-y-full group-focus-visible:-translate-y-full">
+                {spaceLabel(activeSpace)}
+              </span>
+              <span className="absolute left-0 top-full flex items-center gap-2 font-mono text-[11px] uppercase leading-4 tracking-[0.22em] text-white transition-transform duration-200 ease-out group-hover:-translate-y-full group-focus-visible:-translate-y-full">
+                <ArrowLeft className="size-3 shrink-0" />
+                <span>All spaces</span>
+              </span>
+            </button>
+          }
           className="embedded-room-panel"
           onDetach={detachControls}
           accessory={

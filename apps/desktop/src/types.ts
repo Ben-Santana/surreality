@@ -121,10 +121,19 @@ export type CustomMappingPermission =
   | "microphone:read"
   | "network:fetch"
   | "storage:package"
-  | "files:user-selected";
+  | "files:user-selected"
+  | "device:usb"
+  | "device:serial"
+  | "device:camera"
+  | "device:midi"
+  | "network:listen"
+  | "process:spawn"
+  | "background:run"
+  | "events:publish"
+  | "system:unrestricted";
 
 export type CustomMappingPackageManifest = {
-  manifestVersion: 1;
+  manifestVersion: 1 | 2;
   id: string;
   name: string;
   version: string;
@@ -136,7 +145,7 @@ export type CustomMappingPackageManifest = {
   contentSize: { width: number; height: number };
   defaultColor: Rgba;
   defaultConfig: Record<string, unknown>;
-  entrypoints: { mapping: string; inspector?: string; runtime?: string };
+  entrypoints: { mapping: string; inspector?: string; runtime?: string; plugin?: string };
   permissions?: CustomMappingPermission[];
   thumbnail?: string;
   bundled?: boolean;
@@ -189,8 +198,15 @@ export type RoomAPI = {
   importCustomMapping: () => Promise<CustomMappingImportResult>;
   uninstallCustomMapping: (packageId: string, packageVersion: string) => Promise<CustomMappingUninstallResult>;
   onCustomMappingsChanged: (callback: () => void) => () => void;
+  onPluginData: (callback: (payload: PluginDataMessage) => void) => () => void;
   sync: (payload: unknown) => void;
   onSync: (callback: (payload: unknown) => void) => () => void;
+};
+
+export type PluginDataMessage = {
+  packageId: string;
+  channel: string;
+  data: unknown;
 };
 
 export type SyncPayload = {

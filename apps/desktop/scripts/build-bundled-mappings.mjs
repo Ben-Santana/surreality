@@ -4,7 +4,7 @@ import path from "node:path";
 const outputDirectory = path.resolve("mappings");
 const nativeEntrypoint = "// This package is rendered by Surreality's native compatibility runtime.\nexport default function mount() {}\n";
 const common = {
-  manifestVersion: 1,
+  manifestVersion: 2,
   version: "1.0.0",
   configVersion: 1,
   author: { name: "Surreality" },
@@ -26,6 +26,6 @@ for (const manifest of manifests) {
     manifest,
     files: { "mapping.js": { encoding: "utf8", content: nativeEntrypoint } },
   };
-  fs.writeFileSync(path.join(outputDirectory, `${manifest.id}-${manifest.version}.mapping`), `${JSON.stringify(archive)}\n`);
+  fs.writeFileSync(path.join(outputDirectory, `${manifest.id}-${manifest.version}.surreality`), `${JSON.stringify(archive)}\n`);
 }
 console.log(`Built ${manifests.length} mapping packages in ${path.relative(process.cwd(), outputDirectory)}`);

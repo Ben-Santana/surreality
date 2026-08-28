@@ -11,6 +11,7 @@ import {
   Plus,
   Presentation,
   Redo2,
+  Save,
   Sparkles,
   PackagePlus,
   Trash2,
@@ -22,7 +23,6 @@ import { CORE_MEDIA_PACKAGE_ID, importCustomMappingPackage, uninstallCustomMappi
 import { useRoomStore } from "../store";
 import type { DisplayInfo, GridSize, Tool } from "../types";
 import Flyout, { eventInside } from "./Flyout";
-import SpacesMenu from "./SpacesMenu";
 
 const createTools: { id: Exclude<Tool, "select" | "custom">; label: string; shortcut: string; icon: ReactNode }[] = [
   { id: "surface", label: "Surface", shortcut: "R", icon: <Frame className="size-4" /> },
@@ -58,6 +58,8 @@ export default function Toolbar() {
   const canRedo = useRoomStore((state) => state.future.length > 0);
   const undo = useRoomStore((state) => state.undo);
   const redo = useRoomStore((state) => state.redo);
+  const requestSave = useRoomStore((state) => state.requestSave);
+  const spaceDirty = useRoomStore((state) => state.isSpaceDirty());
   const [displays, setDisplays] = useState<DisplayInfo[]>([]);
   const [menu, setMenu] = useState<MenuId | null>(null);
   const [customOpen, setCustomOpen] = useState(false);
@@ -353,7 +355,7 @@ export default function Toolbar() {
                   onClick={() => void importPackage()}
                 >
                   <PackagePlus className="size-4 shrink-0" />
-                  {importing ? "Opening package…" : "Import .mapping…"}
+                  {importing ? "Opening package…" : "Import .surreality…"}
                 </button>
                 </div>
               </div>
@@ -392,9 +394,17 @@ export default function Toolbar() {
         <Redo2 className="size-4" />
       </button>
 
-      <div className="mx-2 h-5 w-px bg-white/15" />
-
-      <SpacesMenu />
+      <button
+        type="button"
+        title="Save (⌘S)"
+        onClick={requestSave}
+        className={`flex h-8 items-center gap-2 px-2.5 text-[13px] transition hover:bg-white/10 hover:text-white ${
+          spaceDirty ? "text-accent" : "text-white/70"
+        }`}
+      >
+        <Save className="size-4" />
+        <span className="hidden sm:inline">Save</span>
+      </button>
 
       <div className="mx-2 h-5 w-px bg-white/15" />
 
