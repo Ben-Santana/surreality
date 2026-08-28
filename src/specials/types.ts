@@ -67,7 +67,7 @@ export function asConfig<C>(mapping: SpecialMapping, fallback: C): C {
 }
 
 export function definitionConfig<C>(definition: SpecialDefinition<C>, mapping: SpecialMapping): C {
-  const version = mapping.version ?? 0;
+  const version = mapping.configVersion ?? 0;
   const current = definition.version ?? 1;
   const value = version < current && definition.migrateConfig
     ? definition.migrateConfig(mapping.config, version)

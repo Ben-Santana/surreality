@@ -36,7 +36,7 @@ export function applySoundSnapshot(value: unknown) {
   if (typeof next.id !== "string" || typeof next.sequence !== "number" || next.sequence <= pulse.sequence) return;
   pulse = { id: next.id, sequence: next.sequence };
   const mapping = (window as Window & { __roomMappings?: import("../../types").Mapping[] }).__roomMappings?.find((item) => item.id === next.id);
-  if (!mapping || mapping.type !== "special") return;
+  if (!mapping || mapping.type !== "custom") return;
   const config = mapping.config as unknown as SoundConfig;
   playSound(config);
 }

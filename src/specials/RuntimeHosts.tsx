@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
 import { listSpecials } from "./registry";
 
-export function SpecialRuntimeHosts() {
+export function CustomMappingRuntimeHosts() {
   return <>{listSpecials().map(({ kind, runtime }) => runtime?.Host ? <runtime.Host key={kind} /> : null)}</>;
 }
 
-export function SpecialRuntimeOverlays() {
+export function CustomMappingRuntimeOverlays() {
   return <>{listSpecials().map(({ kind, runtime }) => runtime?.Overlay ? <runtime.Overlay key={kind} /> : null)}</>;
 }
+
+/** Compatibility aliases for bundled mappings. */
+export const SpecialRuntimeHosts = CustomMappingRuntimeHosts;
+export const SpecialRuntimeOverlays = CustomMappingRuntimeOverlays;
 
 function readSnapshots() {
   return Object.fromEntries(listSpecials().filter((item) => item.runtime?.getSnapshot).map((item) => [item.kind, item.runtime?.getSnapshot?.()]));

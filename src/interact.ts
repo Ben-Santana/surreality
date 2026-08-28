@@ -5,19 +5,19 @@ import {
   segmentsIntersect,
   translateVertices,
 } from "./geometry";
-import { getSpecial } from "./specials/registry";
-import { emitSpecialEvent } from "./specials/events";
-import type { Mapping, Point, SpecialMapping } from "./types";
-import { isSpecialMapping } from "./types";
+import { getCustomMapping } from "./customMappings/registry";
+import { emitCustomMappingEvent } from "./customMappings/events";
+import type { CustomMapping, Mapping, Point } from "./types";
+import { isCustomMapping } from "./types";
 
 export function sameSurface(a: Mapping, b: Mapping): boolean {
   return (a.surfaceId ?? null) === (b.surfaceId ?? null);
 }
 
-/** Non-specials are always solid; specials default solid unless they opt out. */
+/** Basic mappings are always solid; custom mappings may opt out. */
 export function isSolid(mapping: Mapping): boolean {
-  if (!isSpecialMapping(mapping)) return true;
-  return getSpecial(mapping.kind)?.solid !== false;
+  if (!isCustomMapping(mapping)) return true;
+  return getCustomMapping(mapping.packageId, mapping.packageVersion)?.definition?.solid !== false;
 }
 
 /** Same-surface solid mappings, excluding the actor. Order matches `mappings`. */
@@ -70,19 +70,26 @@ export function mappingHitAlong(
   return null;
 }
 
-/** Click-equivalent: interactive specials with `onActivate`. */
+/** Click-equivalent for custom mappings that request pointer input. */
 export function activateMapping(mapping: Mapping): boolean {
-  if (!isSpecialMapping(mapping) || !getSpecial(mapping.kind)?.interactive) return false;
-  emitSpecialEvent({ type: "activate", targetId: mapping.id });
+  if (!isCustomMapping(mapping)) return false;
+  const entry = getCustomMapping(mapping.packageId, mapping.packageVersion);
+  const interactive = entry?.definition?.interactive || entry?.manifest.permissions?.includes("input:pointer");
+  if (!interactive) return false;
+  emitCustomMappingEvent({ type: "activate", targetId: mapping.id });
   return true;
 }
 
-export function interactiveSpecialAt(mappings: Mapping[], point: Point): SpecialMapping | null {
+export function interactiveCustomMappingAt(mappings: Mapping[], point: Point): CustomMapping | null {
   const hit = mappingBodyAt(mappings, point);
-  if (!hit || !isSpecialMapping(hit)) return null;
-  if (!getSpecial(hit.kind)?.interactive) return null;
+  if (!hit || !isCustomMapping(hit)) return null;
+  const entry = getCustomMapping(hit.packageId, hit.packageVersion);
+  if (!entry?.definition?.interactive && !entry?.manifest.permissions?.includes("input:pointer")) return null;
   return hit;
 }
+
+/** @deprecated Use interactiveCustomMappingAt. */
+export const interactiveSpecialAt = interactiveCustomMappingAt;
 
 /** Whether a segment intersects the ellipse described by two (possibly skewed) axes. */
 function segmentIntersectsEllipse(

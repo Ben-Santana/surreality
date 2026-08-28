@@ -2,7 +2,7 @@ export type Point = { x: number; y: number };
 
 export type Rgba = { r: number; g: number; b: number; a: number };
 
-export type Tool = "select" | "surface" | "polygon" | "circle" | "text" | "special";
+export type Tool = "select" | "surface" | "polygon" | "circle" | "text" | "custom";
 
 export type GridSize = "small" | "medium" | "large";
 
@@ -29,7 +29,7 @@ export const IDENTITY_SKEW: PanelSkew = [
 
 export const PANEL_SIZE = { width: 780, height: 516 };
 
-export type MappingType = "polygon" | "circle" | "text" | "special";
+export type MappingType = "polygon" | "circle" | "text" | "custom";
 
 type MappingBase = {
   id: string;
@@ -80,15 +80,18 @@ export type TextMapping = MappingBase & {
   clockGlow?: boolean;
 };
 
-export type SpecialMapping = MappingBase & {
-  type: "special";
-  kind: string;
-  /** Definition version used to migrate persisted config safely. */
-  version?: number;
+export type CustomMapping = MappingBase & {
+  type: "custom";
+  /** Stable package identity, independent of the package's display name. */
+  packageId: string;
+  /** Exact package version used when this mapping was created. */
+  packageVersion: string;
+  /** Package-owned configuration schema version. */
+  configVersion: number;
   config: Record<string, unknown>;
 };
 
-export type Mapping = PolygonMapping | CircleMapping | TextMapping | SpecialMapping;
+export type Mapping = PolygonMapping | CircleMapping | TextMapping | CustomMapping;
 
 export type Space = {
   id: string;
@@ -98,9 +101,56 @@ export type Space = {
   updatedAt: number;
 };
 
-export function isSpecialMapping(mapping: Mapping): mapping is SpecialMapping {
-  return mapping.type === "special";
+export function isCustomMapping(mapping: Mapping): mapping is CustomMapping {
+  return mapping.type === "custom";
 }
+
+/** @deprecated Bundled mappings still use this alias internally while moving to the public SDK. */
+export type SpecialMapping = CustomMapping;
+
+/** @deprecated Use isCustomMapping. */
+export const isSpecialMapping = isCustomMapping;
+
+export type CustomMappingGeometry = "quad" | "polygon" | "circle";
+
+export type CustomMappingPermission =
+  | "audio:play"
+  | "events:room"
+  | "input:keyboard"
+  | "input:pointer"
+  | "microphone:read"
+  | "network:fetch"
+  | "storage:package"
+  | "files:user-selected";
+
+export type CustomMappingPackageManifest = {
+  manifestVersion: 1;
+  id: string;
+  name: string;
+  version: string;
+  configVersion: number;
+  description: string;
+  author?: { name: string; url?: string };
+  minimumAppVersion?: string;
+  geometry: CustomMappingGeometry;
+  contentSize: { width: number; height: number };
+  defaultColor: Rgba;
+  defaultConfig: Record<string, unknown>;
+  entrypoints: { mapping: string; inspector?: string; runtime?: string };
+  permissions?: CustomMappingPermission[];
+  thumbnail?: string;
+  bundled?: boolean;
+};
+
+export type CustomMappingPackageRecord = {
+  manifest: CustomMappingPackageManifest;
+  source: "bundled" | "installed";
+  enabled: boolean;
+};
+
+export type CustomMappingImportResult =
+  | { canceled: true }
+  | { canceled: false; installed: CustomMappingPackageRecord };
 
 export type ContextMenuState = {
   x: number;
@@ -133,6 +183,9 @@ export type RoomAPI = {
   onOutputClosed: (callback: () => void) => () => void;
   onUndo: (callback: () => void) => () => void;
   onRedo: (callback: () => void) => () => void;
+  listCustomMappings: () => Promise<CustomMappingPackageRecord[]>;
+  importCustomMapping: () => Promise<CustomMappingImportResult>;
+  onCustomMappingsChanged: (callback: () => void) => () => void;
   sync: (payload: unknown) => void;
   onSync: (callback: (payload: unknown) => void) => () => void;
 };

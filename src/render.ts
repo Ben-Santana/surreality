@@ -10,8 +10,7 @@ import {
 import { GRID_STEPS, type Mapping, type Point, type Rgba, type Surface, type TextMapping } from "./types";
 import { textFont } from "./textFonts";
 import { wallMetric, wallToScreenPoint } from "./wall";
-import { getSpecial } from "./specials/registry";
-import { specialGeometry } from "./specials/types";
+import { customMappingGeometry } from "./customMappings/config";
 
 const textCache = new Map<string, { key: string; canvas: HTMLCanvasElement }>();
 
@@ -526,7 +525,7 @@ export function renderStage(
   for (const mapping of mappings) {
     if (isCircleGeometry(mapping)) drawEllipse(ctx, mapping);
     else if (mapping.type === "text") drawText(ctx, mapping);
-    else if (mapping.type === "special" && specialGeometry(mapping, getSpecial(mapping.kind)?.geometry) !== "polygon") {
+    else if (mapping.type === "custom" && customMappingGeometry(mapping) !== "polygon") {
       if (options.edit) {
         if (!isValidWarpQuad(mapping.vertices)) drawInvalidQuad(ctx, mapping.vertices);
         else drawQuadOutline(ctx, mapping.vertices);

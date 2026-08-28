@@ -4,7 +4,6 @@ import {
   Frame,
   Grid3x3,
   Magnet,
-  ImagePlay,
   Monitor,
   MousePointer2,
   Pentagon,
@@ -12,17 +11,18 @@ import {
   Presentation,
   Redo2,
   Sparkles,
+  PackagePlus,
   Type,
   Undo2,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { listSpecialMappingChoices } from "../specials/registry";
+import { importCustomMappingPackage, useCustomMappings } from "../customMappings/registry";
 import { useRoomStore } from "../store";
 import type { DisplayInfo, GridSize, Tool } from "../types";
 import Flyout, { eventInside } from "./Flyout";
 import SpacesMenu from "./SpacesMenu";
 
-const createTools: { id: Exclude<Tool, "select" | "special">; label: string; shortcut: string; icon: ReactNode }[] = [
+const createTools: { id: Exclude<Tool, "select" | "custom">; label: string; shortcut: string; icon: ReactNode }[] = [
   { id: "surface", label: "Surface", shortcut: "R", icon: <Frame className="size-4" /> },
   { id: "polygon", label: "Polygon", shortcut: "P", icon: <Pentagon className="size-4" /> },
   { id: "circle", label: "Circle", shortcut: "C", icon: <Circle className="size-4" /> },
@@ -40,8 +40,8 @@ type MenuId = "add" | "grid" | "projector";
 export default function Toolbar() {
   const tool = useRoomStore((state) => state.tool);
   const setTool = useRoomStore((state) => state.setTool);
-  const specialKind = useRoomStore((state) => state.specialKind);
-  const setSpecialKind = useRoomStore((state) => state.setSpecialKind);
+  const customMappingPackageId = useRoomStore((state) => state.customMappingPackageId);
+  const setCustomMappingPackage = useRoomStore((state) => state.setCustomMappingPackage);
   const editMode = useRoomStore((state) => state.editMode);
   const setEditMode = useRoomStore((state) => state.setEditMode);
   const showGrid = useRoomStore((state) => state.showGrid);
@@ -58,42 +58,68 @@ export default function Toolbar() {
   const redo = useRoomStore((state) => state.redo);
   const [displays, setDisplays] = useState<DisplayInfo[]>([]);
   const [menu, setMenu] = useState<MenuId | null>(null);
-  const [specialOpen, setSpecialOpen] = useState(false);
-  const [specialSide, setSpecialSide] = useState<"left" | "right">("right");
-  const specials = listSpecialMappingChoices();
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customSide, setCustomSide] = useState<"left" | "right">("right");
+  const [importing, setImporting] = useState(false);
+  const [notice, setNotice] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const customMappings = useCustomMappings();
   const addRef = useRef<HTMLDivElement>(null);
   const addMenuRef = useRef<HTMLDivElement>(null);
-  const specialRowRef = useRef<HTMLDivElement>(null);
-  const specialMenuRef = useRef<HTMLDivElement>(null);
+  const customRowRef = useRef<HTMLDivElement>(null);
+  const customMenuRef = useRef<HTMLDivElement>(null);
   const gridSizeRef = useRef<HTMLDivElement>(null);
   const gridMenuRef = useRef<HTMLDivElement>(null);
   const projectorRef = useRef<HTMLDivElement>(null);
   const projectorMenuRef = useRef<HTMLDivElement>(null);
-  const specialCloseTimer = useRef<number>(0);
+  const customCloseTimer = useRef<number>(0);
   const createActive = tool !== "select" && editMode;
 
   const toggleMenu = (id: MenuId) => {
-    setSpecialOpen(false);
+    setCustomOpen(false);
     setMenu((current) => (current === id ? null : id));
   };
 
   const closeMenus = () => {
     setMenu(null);
-    setSpecialOpen(false);
+    setCustomOpen(false);
   };
 
-  const openSpecial = () => {
-    window.clearTimeout(specialCloseTimer.current);
-    const row = specialRowRef.current?.getBoundingClientRect();
+  const openCustom = () => {
+    window.clearTimeout(customCloseTimer.current);
+    const row = customRowRef.current?.getBoundingClientRect();
     if (row) {
-      setSpecialSide(row.right + 232 < window.innerWidth ? "right" : "left");
+      setCustomSide(row.right + 232 < window.innerWidth ? "right" : "left");
     }
-    setSpecialOpen(true);
+    setCustomOpen(true);
   };
 
-  const closeSpecialSoon = () => {
-    window.clearTimeout(specialCloseTimer.current);
-    specialCloseTimer.current = window.setTimeout(() => setSpecialOpen(false), 150);
+  const closeCustomSoon = () => {
+    window.clearTimeout(customCloseTimer.current);
+    customCloseTimer.current = window.setTimeout(() => setCustomOpen(false), 250);
+  };
+
+  const showNotice = (tone: "success" | "error", message: string) => {
+    setNotice({ tone, message });
+    window.setTimeout(() => setNotice(null), 4500);
+  };
+
+  const importPackage = async () => {
+    if (importing) return;
+    setImporting(true);
+    closeMenus();
+    try {
+      const result = await importCustomMappingPackage();
+      if (result && !result.canceled) {
+        showNotice("success", `${result.installed.manifest.name} ${result.installed.manifest.version} installed.`);
+      }
+    } catch (error) {
+      showNotice(
+        "error",
+        error instanceof Error ? error.message : "The custom mapping could not be installed.",
+      );
+    } finally {
+      setImporting(false);
+    }
   };
 
   useEffect(() => {
@@ -108,13 +134,13 @@ export default function Toolbar() {
           event,
           addRef.current,
           addMenuRef.current,
-          specialRowRef.current,
-          specialMenuRef.current,
+          customRowRef.current,
+          customMenuRef.current,
         ) &&
         menu === "add"
       ) {
         setMenu(null);
-        setSpecialOpen(false);
+        setCustomOpen(false);
       }
       if (!eventInside(event, gridSizeRef.current, gridMenuRef.current) && menu === "grid") {
         setMenu(null);
@@ -126,12 +152,24 @@ export default function Toolbar() {
     window.addEventListener("pointerdown", onPointerDown);
     return () => {
       window.removeEventListener("pointerdown", onPointerDown);
-      window.clearTimeout(specialCloseTimer.current);
+      window.clearTimeout(customCloseTimer.current);
     };
   }, [menu]);
 
   return (
     <div className="flex flex-wrap items-center gap-1">
+      {notice ? (
+        <div
+          role="status"
+          className={`fixed right-5 top-5 z-[120] max-w-sm border px-4 py-3 text-[12px] shadow-2xl backdrop-blur ${
+            notice.tone === "success"
+              ? "border-emerald-400/35 bg-emerald-950/95 text-emerald-100"
+              : "border-red-400/35 bg-red-950/95 text-red-100"
+          }`}
+        >
+          {notice.message}
+        </div>
+      ) : null}
       <button
         type="button"
         title="Select (V)"
@@ -161,8 +199,11 @@ export default function Toolbar() {
           <span className="hidden sm:inline">Add</span>
           <ChevronDown className="size-3 opacity-70" />
         </button>
-        <Flyout open={menu === "add"} anchorRef={addRef} contentRef={addMenuRef} className="w-52">
+        <Flyout open={menu === "add"} anchorRef={addRef} contentRef={addMenuRef} className="w-60">
           <div className="overflow-visible rounded-none border border-white/10 bg-[#111114] p-1 shadow-2xl">
+            <p className="px-2 pb-1 pt-1.5 font-mono text-[9px] uppercase tracking-[0.22em] text-white/35">
+              Basic
+            </p>
             {createTools.map((item) => (
               <button
                 key={item.id}
@@ -181,75 +222,79 @@ export default function Toolbar() {
                 <span className="font-mono text-[10px] text-white/35">{item.shortcut}</span>
               </button>
             ))}
-            <button
-              type="button"
-              title="Media (M)"
-              className={`flex h-8 w-full items-center gap-2 rounded-none px-2 text-left text-[13px] hover:bg-white/10 ${
-                tool === "special" && specialKind === "media" && editMode
-                  ? "bg-accent/15 text-accent"
-                  : "text-white"
-              }`}
-              onClick={() => {
-                setSpecialKind("media");
-                closeMenus();
-              }}
-            >
-              <ImagePlay className="size-4 opacity-80" />
-              <span className="flex-1">Media</span>
-              <span className="font-mono text-[10px] text-white/35">M</span>
-            </button>
             <div
-              ref={specialRowRef}
-              onMouseEnter={openSpecial}
-              onMouseLeave={closeSpecialSoon}
+              ref={customRowRef}
+              onMouseEnter={openCustom}
+              onMouseLeave={closeCustomSoon}
             >
               <button
                 type="button"
-                title="Special mappings (S)"
+                title="Custom mappings (M)"
                 className={`flex h-8 w-full items-center gap-2 rounded-none px-2 text-left text-[13px] hover:bg-white/10 ${
-                  tool === "special" && editMode ? "bg-accent/15 text-accent" : "text-white"
+                  tool === "custom" && editMode ? "bg-accent/15 text-accent" : "text-white"
                 }`}
-                onClick={() => {
-                  setTool("special");
-                  openSpecial();
-                }}
+                onClick={openCustom}
               >
-                <Sparkles className="size-4 opacity-80" />
-                <span className="flex-1">Special</span>
-                <span className="font-mono text-[10px] text-white/35">S</span>
+                <Sparkles className="size-4 shrink-0 opacity-80" />
+                <span className="min-w-0 flex-1 whitespace-nowrap">Custom Mappings</span>
+                <span className="font-mono text-[10px] text-white/35">M</span>
                 <span className="text-white/35">›</span>
               </button>
             </div>
             <Flyout
-              open={specialOpen}
-              anchorRef={specialRowRef}
-              contentRef={specialMenuRef}
-              placement={specialSide === "right" ? "right-start" : "left-start"}
-              className="w-56"
+              open={customOpen}
+              anchorRef={customRowRef}
+              contentRef={customMenuRef}
+              placement={customSide === "right" ? "right-start" : "left-start"}
+              offset={0}
+              className="w-72"
             >
               <div
-                className="rounded-none border border-white/10 bg-[#111114] p-1 shadow-2xl"
-                onMouseEnter={openSpecial}
-                onMouseLeave={closeSpecialSoon}
+                className="overflow-hidden rounded-none border border-white/10 bg-[#111114] shadow-2xl"
+                onMouseEnter={openCustom}
+                onMouseLeave={closeCustomSoon}
               >
-                {specials.map((item) => (
-                  <button
-                    key={item.kind}
-                    type="button"
-                    className={`flex w-full flex-col rounded-none px-3 py-2 text-left hover:bg-white/10 ${
-                      tool === "special" && specialKind === item.kind
-                        ? "bg-accent/15 text-accent"
-                        : ""
-                    }`}
-                    onClick={() => {
-                      setSpecialKind(item.kind);
-                      closeMenus();
-                    }}
-                  >
-                    <span className="text-[13px] text-white">{item.label}</span>
-                    <span className="text-[11px] leading-snug text-white/45">{item.description}</span>
-                  </button>
-                ))}
+                <div className="border-b border-white/10 px-3 py-2.5">
+                  <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-accent">Custom Mappings</p>
+                  <p className="mt-1 text-[11px] text-white/40">Installed code-powered mappings</p>
+                </div>
+                <div className="max-h-72 overflow-y-auto p-1">
+                  {customMappings.map((item) => (
+                    <button
+                      key={`${item.manifest.id}@${item.manifest.version}`}
+                      type="button"
+                      className={`flex w-full items-start gap-2 rounded-none px-2.5 py-2 text-left hover:bg-white/10 ${
+                        tool === "custom" && customMappingPackageId === item.manifest.id
+                          ? "bg-accent/15 text-accent"
+                          : ""
+                      }`}
+                      onClick={() => {
+                        setCustomMappingPackage(item.manifest.id);
+                        closeMenus();
+                      }}
+                    >
+                      <Sparkles className="mt-0.5 size-3.5 shrink-0 text-white/45" />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-baseline justify-between gap-3">
+                          <span className="truncate text-[13px] text-white">{item.manifest.name}</span>
+                          <span className="shrink-0 font-mono text-[9px] text-white/30">v{item.manifest.version}</span>
+                        </span>
+                        <span className="mt-0.5 block truncate text-[10px] text-white/40">{item.manifest.description}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <div className="border-t border-white/10 p-1">
+                <button
+                  type="button"
+                  disabled={importing}
+                  className="flex h-10 w-full items-center gap-2 px-2.5 text-left text-[12px] text-white/70 hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-50"
+                  onClick={() => void importPackage()}
+                >
+                  <PackagePlus className="size-4 shrink-0" />
+                  {importing ? "Opening package…" : "Import .roommapping…"}
+                </button>
+                </div>
               </div>
             </Flyout>
           </div>

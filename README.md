@@ -11,12 +11,17 @@ npm run check
 npm run build
 ```
 
-## Add a mapping
+## Custom mappings
+
+The editor includes Polygon, Circle, and Text as basic mappings. Everything else appears under **Custom Mappings**. The current Media, Dithered Media, Feynman, Sound, and Ship mappings are bundled custom mappings; third-party packages use the same package identity model and run as isolated browser code.
+
+Create and package a mapping:
 
 ```bash
 npm run create:mapping -- ripple
+npm run pack:mapping -- ./custom-mappings/ripple
 ```
 
-Register the generated definition in `src/specials/registry.ts`. The registry automatically supplies creation UI, factory behavior, the inspector host, stage/projector rendering, icons, runtime hosts, overlays, and runtime synchronization.
+Import the resulting `.roommapping` file from **Add → Custom Mappings → Import package…**.
 
-See [docs/creating-a-mapping.md](docs/creating-a-mapping.md) for the complete contract and interaction model.
+See [docs/creating-a-mapping.md](docs/creating-a-mapping.md) for the package manifest, sandbox, SDK context, permissions, and event contract.

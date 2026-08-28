@@ -6,7 +6,7 @@ import RoomPanel from "./RoomPanel";
 import SpaceNameDialog from "./SpaceNameDialog";
 import SpacePicker from "./SpacePicker";
 import Stage from "./Stage";
-import { SpecialRuntimeHosts } from "../specials/RuntimeHosts";
+import { CustomMappingRuntimeHosts } from "../customMappings/runtime";
 
 function isTypingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
@@ -173,8 +173,7 @@ export default function Editor() {
       if (event.key.toLowerCase() === "p") setTool("polygon");
       if (event.key.toLowerCase() === "c") setTool("circle");
       if (event.key.toLowerCase() === "t") setTool("text");
-      if (event.key.toLowerCase() === "m") setTool("special", "media");
-      if (event.key.toLowerCase() === "s") setTool("special");
+      if (event.key.toLowerCase() === "m") setTool("custom");
       if (event.key.toLowerCase() === "g") toggleGrid();
     };
 
@@ -204,7 +203,7 @@ export default function Editor() {
 
   return (
     <div className="relative h-screen bg-black">
-      <SpecialRuntimeHosts />
+      <CustomMappingRuntimeHosts />
       {editMode ? (
         <div className="drag-region pointer-events-auto absolute left-0 top-0 z-50 h-12 w-[88px]" />
       ) : null}

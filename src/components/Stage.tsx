@@ -6,13 +6,13 @@ import {
   hitTestSurfaceHandle,
   snapPoint,
 } from "../geometry";
-import { activateMapping, interactiveSpecialAt } from "../interact";
+import { activateMapping, interactiveCustomMappingAt } from "../interact";
 import { useRoomStore } from "../store";
 import { displayMappings, screenToWallPoint, topSurfaceAt, wallToScreenPoint } from "../wall";
 import { GRID_STEPS, type Point } from "../types";
 import MappingCanvas, { canvasPoint } from "./MappingCanvas";
-import SpecialOverlays from "./SpecialOverlays";
-import { SpecialRuntimeOverlays } from "../specials/RuntimeHosts";
+import CustomMappingOverlays from "./CustomMappingOverlays";
+import { CustomMappingRuntimeOverlays } from "../customMappings/runtime";
 
 type Drag =
   | { type: "mapping"; id: string; kind: "vertex"; index: number }
@@ -97,7 +97,7 @@ export default function Stage() {
           closeMenu();
 
           if (!editMode) {
-            const pad = interactiveSpecialAt(shown, point);
+            const pad = interactiveCustomMappingAt(shown, point);
             if (pad) activateMapping(pad);
             return;
           }
@@ -193,7 +193,7 @@ export default function Stage() {
             setPolygonPointer(snappedPoint(raw));
           }
           if (!editMode) {
-            setHoverSound(Boolean(raw && interactiveSpecialAt(shown, raw)));
+            setHoverSound(Boolean(raw && interactiveCustomMappingAt(shown, raw)));
           }
           const drag = dragRef.current;
           if (!drag || !raw) return;
@@ -275,8 +275,8 @@ export default function Stage() {
           ))}
         </svg>
       ) : null}
-      <SpecialOverlays mappings={shown} />
-      <SpecialRuntimeOverlays />
+      <CustomMappingOverlays mappings={shown} runRuntime />
+      <CustomMappingRuntimeOverlays />
       {editMode ? (
         <MappingCanvas
           mappings={shown}

@@ -243,7 +243,7 @@ function isTypingTarget(target: EventTarget | null) {
 }
 
 function isShip(mapping: Mapping): mapping is SpecialMapping {
-  return isSpecialMapping(mapping) && mapping.kind === "ship";
+  return isSpecialMapping(mapping) && mapping.packageId === "room.mapping.ship";
 }
 
 function heading(angle: number): Point {

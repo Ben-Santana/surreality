@@ -2,9 +2,10 @@ import { createRequire } from "node:module";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { BrowserWindow as ElectronWindow } from "electron";
+import type { BrowserWindow as ElectronWindow, MessageBoxOptions, OpenDialogOptions } from "electron";
+import { inspectCustomMappingArchive, installCustomMappingArchive, listInstalledCustomMappings, registerCustomMappingProtocol } from "./customMappings";
 
-const { app, BrowserWindow, ipcMain, Menu, screen } = createRequire(import.meta.url)(
+const { app, BrowserWindow, dialog, ipcMain, Menu, protocol, screen } = createRequire(import.meta.url)(
   "electron",
 ) as typeof import("electron");
 
@@ -12,6 +13,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 const RENDERER_DIST = path.join(__dirname, "../dist");
+
+protocol.registerSchemesAsPrivileged([{ scheme: "room-mapping", privileges: { secure: true, standard: true, supportFetchAPI: true, corsEnabled: true } }]);
 
 let editorWindow: ElectronWindow | null = null;
 let outputWindow: ElectronWindow | null = null;
@@ -207,6 +210,7 @@ function installMenu() {
 app.whenReady().then(() => {
   app.setName("Projection Mapping Room");
   installMenu();
+  registerCustomMappingProtocol(app, protocol);
   createEditor();
 
   ipcMain.handle("displays", () =>
@@ -230,6 +234,38 @@ app.whenReady().then(() => {
   ipcMain.handle("close-controls", () => controlsWindow?.close());
   ipcMain.handle("controls-open", () => controlsWindow != null);
   ipcMain.handle("controls-state", () => lastControlsState);
+  ipcMain.handle("custom-mappings:list", () => listInstalledCustomMappings(app));
+  ipcMain.handle("custom-mappings:import", async () => {
+    const options: OpenDialogOptions = {
+      title: "Import Custom Mapping",
+      properties: ["openFile"],
+      filters: [{ name: "Projection Room Mapping", extensions: ["roommapping"] }],
+    };
+    const result = editorWindow
+      ? await dialog.showOpenDialog(editorWindow, options)
+      : await dialog.showOpenDialog(options);
+    const archivePath = result.filePaths[0];
+    if (result.canceled || !archivePath) return { canceled: true };
+    const manifest = inspectCustomMappingArchive(archivePath);
+    const permissions = manifest.permissions?.length ? manifest.permissions.join("\n• ") : "No optional capabilities";
+    const confirmationOptions: MessageBoxOptions = {
+      type: "warning",
+      title: "Install code-powered mapping?",
+      message: `Install ${manifest.name} ${manifest.version}?`,
+      detail: `This package contains executable code. Only install it if you trust ${manifest.author?.name ?? "its publisher"}.\n\nRequested capabilities:\n• ${permissions}\n\nMapping code runs in a restricted browser sandbox, but may still display misleading content or misuse granted capabilities.`,
+      buttons: ["Cancel", "Install"],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    };
+    const confirmation = editorWindow
+      ? await dialog.showMessageBox(editorWindow, confirmationOptions)
+      : await dialog.showMessageBox(confirmationOptions);
+    if (confirmation.response !== 1) return { canceled: true };
+    const installed = installCustomMappingArchive(app, archivePath);
+    for (const window of BrowserWindow.getAllWindows()) window.webContents.send("custom-mappings:changed");
+    return { canceled: false, installed };
+  });
 
   ipcMain.on("controls-sync", (event, payload: unknown) => {
     lastControlsState = payload;

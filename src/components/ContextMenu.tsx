@@ -5,7 +5,6 @@ import {
   ChevronsUp,
   Circle,
   Frame,
-  ImagePlay,
   Palette,
   Pentagon,
   Plus,
@@ -14,7 +13,7 @@ import {
   Type,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { listSpecialMappingChoices } from "../specials/registry";
+import { useCustomMappings } from "../customMappings/registry";
 import { useRoomStore } from "../store";
 import ColorPicker from "./ColorPicker";
 import { isPolygonGeometry } from "../geometry";
@@ -47,7 +46,8 @@ export default function ContextMenu() {
   const addCircle = useRoomStore((state) => state.addCircle);
   const addText = useRoomStore((state) => state.addText);
   const addSurface = useRoomStore((state) => state.addSurface);
-  const addSpecial = useRoomStore((state) => state.addSpecial);
+  const addCustomMapping = useRoomStore((state) => state.addCustomMapping);
+  const customMappings = useCustomMappings();
   const deleteMapping = useRoomStore((state) => state.deleteMapping);
   const deleteSurface = useRoomStore((state) => state.deleteSurface);
   const addVertexNear = useRoomStore((state) => state.addVertexNear);
@@ -97,17 +97,12 @@ export default function ContextMenu() {
           action: () => addText(at),
         },
         {
-          label: "Add media",
-          icon: <ImagePlay className="size-4" />,
-          action: () => addSpecial("media", at),
-        },
-        {
-          label: "Add special",
+          label: "Add custom mapping",
           icon: <Sparkles className="size-4" />,
-          children: listSpecialMappingChoices().map((item) => ({
-            label: item.label,
+          children: customMappings.map((item) => ({
+            label: item.manifest.name,
             icon: <Sparkles className="size-4" />,
-            action: () => addSpecial(item.kind, at),
+            action: () => addCustomMapping(item.manifest.id, at),
           })),
         },
       ];
@@ -161,7 +156,7 @@ export default function ContextMenu() {
     return list;
   }, [
     addCircle,
-    addSpecial,
+    addCustomMapping,
     addSurface,
     addText,
     addVertexNear,
@@ -176,6 +171,7 @@ export default function ContextMenu() {
     setTool,
     setColorMode,
     surface,
+    customMappings,
   ]);
 
   useEffect(() => {

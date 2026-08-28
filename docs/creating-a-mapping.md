@@ -1,46 +1,118 @@
-# Creating a mapping
+# Creating a custom mapping
 
-Each extensible mapping is one folder containing a definition and its private implementation. Core application components must not import an individual mapping.
+Custom mappings are code-powered packages. They execute in a restricted browser iframe and communicate with Projection Mapping Room through a small message-based SDK. A package cannot import the editor, its Zustand store, Electron, or Node.js modules.
 
-## Definition
+## Create and package
 
-Run `npm run create:mapping -- name`, then register the generated definition once in `src/specials/registry.ts`.
+```bash
+npm run create:mapping -- neon-clock
+npm run pack:mapping -- ./custom-mappings/neon-clock
+```
 
-A definition owns:
+The first command creates a manifest, mapping renderer, and inspector. The second creates a `.roommapping` file that can be installed from **Add → Custom Mappings → Import package…**.
 
-- catalogue metadata and icon;
-- versioned, typed configuration;
-- default geometry and appearance;
-- its stage/projector `View` and optional `Inspector`;
-- optional interaction handlers;
-- optional editor runtime, overlay, and projector snapshot adapter.
+A `.roommapping` file is a JSON archive containing the validated manifest and base64-encoded package files. This deliberately keeps the first package format auditable and dependency-free. Published versions are immutable.
 
-Use `parseConfig` for all untrusted persisted data. Increment `version` when stored config changes and implement `migrateConfig`. Old or missing properties must always produce a valid current config.
+## Manifest
 
-## Interactions
+```json
+{
+  "manifestVersion": 1,
+  "id": "com.example.neon-clock",
+  "name": "Neon Clock",
+  "version": "1.0.0",
+  "configVersion": 1,
+  "description": "A code-powered clock.",
+  "author": { "name": "Example" },
+  "geometry": "quad",
+  "contentSize": { "width": 480, "height": 270 },
+  "defaultColor": { "r": 255, "g": 255, "b": 255, "a": 255 },
+  "defaultConfig": { "label": "Hello" },
+  "entrypoints": {
+    "mapping": "mapping.js",
+    "inspector": "inspector.js",
+    "runtime": "runtime.js"
+  },
+  "permissions": ["input:pointer", "events:room"]
+}
+```
 
-Mappings communicate through `emitSpecialEvent` from `src/specials/events.ts`. Do not import another mapping's player, store, or runtime.
+Package IDs use reverse-domain style lowercase identifiers. Versions use semantic version syntax. `geometry` is `quad`, `polygon`, or `circle`.
 
-Supported semantic events are:
+Available permissions are:
 
-- `activate`: a click-equivalent action;
-- `hit`: a spatial impact, with source, target, and point;
-- `signal`: an extensible named value channel.
+- `audio:play`
+- `events:room`
+- `input:keyboard`
+- `input:pointer`
+- `microphone:read`
+- `network:fetch`
+- `storage:package`
+- `files:user-selected`
 
-Handle them with `onEvent` in the definition. Events may target one mapping or broadcast. Consumers should ignore channels and event types they do not support. Spatial producers should target mappings on the same surface unless their feature explicitly operates room-wide.
+Permissions are declared during installation. `network:fetch` changes the iframe Content Security Policy, `input:keyboard` receives sanitized key records, and `input:pointer` enables semantic activation events. The remaining capabilities are reserved for versioned SDK additions and are not implicitly granted as browser or Node access.
 
-## Runtime behavior
+## Entrypoints
 
-Use `runtime.Host` for input listeners or animation loops and `runtime.Overlay` for transient visual effects. If the effect must appear in the projector window, expose `subscribe`, `getSnapshot`, and `applySnapshot`. Runtime snapshots are ephemeral: never put bullets, particles, hover state, or audio triggers in persisted mapping config.
+Entrypoints are standard browser ES modules. They export a mount function:
 
-All persistent mutations should go through `useRoomStore` actions so undo and saved spaces remain coherent. A runtime may read the store directly for frame-critical queries, but should avoid feature-specific changes to `App`, `Editor`, `Stage`, or `OutputView`.
+```js
+export default function mount(context) {
+  context.root.textContent = context.config.label;
 
-## Completion checklist
+  return () => {
+    // Remove listeners or stop animation on remount.
+  };
+}
+```
 
-- Config has a version and validation/migration strategy.
-- No shared component imports the new mapping.
-- Geometry is one of `quad`, `polygon`, or `circle`.
-- Interaction uses semantic events.
-- Ephemeral state uses the runtime snapshot adapter.
-- The mapping works in both editor and projector output.
-- `npm run check` and `npm run build` pass.
+The context contains:
+
+```ts
+type MappingContext = {
+  root: HTMLElement;
+  mode: "mapping" | "inspector" | "runtime";
+  mapping: {
+    id: string;
+    name: string;
+    color: { r: number; g: number; b: number; a: number };
+    config: Record<string, unknown>;
+    packageId: string;
+    packageVersion: string;
+  };
+  manifest: object;
+  config: Record<string, unknown>;
+  color: { r: number; g: number; b: number; a: number };
+  assets: { url(relativePath: string): string };
+  updateConfig(config: Record<string, unknown>): void;
+  emit(event: MappingEvent): void;
+  log(...values: unknown[]): void;
+};
+```
+
+An inspector calls `updateConfig` with the complete next configuration. The editor validates that it is an object, records the change in undo history, and sends it back to every relevant frame.
+
+An entrypoint may return either a cleanup function or an object with `destroy()`, `onEvent(event)`, and `onInput(input)` methods. It may also export top-level `onEvent` and `onInput` functions. Packages declaring `input:keyboard` receive sanitized `keydown` and `keyup` records; they never receive the host DOM event.
+
+## Events
+
+Mappings exchange semantic messages instead of accessing one another:
+
+```js
+context.emit({
+  type: "signal",
+  targetId: "optional-instance-id",
+  channel: "beat",
+  value: 1
+});
+```
+
+Supported event types are `activate`, `hit`, and `signal`. The host always replaces an emitted event's `sourceId` with the sending mapping instance ID.
+
+## Security and compatibility
+
+Installed mapping code receives no Node integration and runs in an iframe with `sandbox="allow-scripts"`. Package paths, sizes, entrypoints, colors, permissions, identifiers, and versions are validated before installation. The custom protocol applies a restrictive Content Security Policy.
+
+Installed code is still untrusted visual and behavioral content. Users see an explicit code-execution warning and requested capabilities before installation. A package should never be installed solely because its file extension looks familiar.
+
+Spaces store the exact package ID, package version, and configuration version. If a package is unavailable, the mapping remains in the space as a placeholder and its configuration is preserved.

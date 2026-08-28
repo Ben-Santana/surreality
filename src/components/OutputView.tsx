@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { activateMapping, interactiveSpecialAt } from "../interact";
-import { applyRuntimeSnapshots, SpecialRuntimeOverlays } from "../specials/RuntimeHosts";
+import { activateMapping, interactiveCustomMappingAt } from "../interact";
+import { applyRuntimeSnapshots, CustomMappingRuntimeOverlays } from "../customMappings/runtime";
 import type { Mapping, SyncPayload } from "../types";
 import MappingCanvas, { canvasPoint } from "./MappingCanvas";
-import SpecialOverlays from "./SpecialOverlays";
+import CustomMappingOverlays from "./CustomMappingOverlays";
 
 export default function OutputView() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -42,16 +42,16 @@ export default function OutputView() {
         onPointerDown={(event) => {
           const point = pointFromEvent(event);
           if (!point) return;
-          const pad = interactiveSpecialAt(mappings, point);
+          const pad = interactiveCustomMappingAt(mappings, point);
           if (pad) activateMapping(pad);
         }}
         onPointerMove={(event) => {
           const point = pointFromEvent(event);
-          setHoverSound(Boolean(point && interactiveSpecialAt(mappings, point)));
+          setHoverSound(Boolean(point && interactiveCustomMappingAt(mappings, point)));
         }}
       />
-      <SpecialOverlays mappings={mappings} />
-      <SpecialRuntimeOverlays />
+      <CustomMappingOverlays mappings={mappings} />
+      <CustomMappingRuntimeOverlays />
     </div>
   );
 }

@@ -1,10 +1,10 @@
-import { getSpecial } from "./specials/registry";
+import { getCustomMapping } from "./customMappings/registry";
 import type {
   CircleMapping,
   Mapping,
   Point,
   PolygonMapping,
-  SpecialMapping,
+  CustomMapping,
   Surface,
   TextMapping,
 } from "./types";
@@ -18,7 +18,7 @@ const counters: Record<string, number> = {
 };
 
 function counterKey(mapping: Mapping) {
-  return mapping.type === "special" ? `special:${mapping.kind}` : mapping.type;
+  return mapping.type === "custom" ? `custom:${mapping.packageId}` : mapping.type;
 }
 
 export function resetCounters(mappings: Mapping[], surfaces: Surface[] = []) {
@@ -93,12 +93,13 @@ export function createText(position: Point): TextMapping {
   };
 }
 
-export function createSpecial(kind: string, position: Point): SpecialMapping | null {
-  const definition = getSpecial(kind);
-  if (!definition) return null;
+export function createCustomMapping(packageId: string, position: Point): CustomMapping | null {
+  const entry = getCustomMapping(packageId);
+  if (!entry) return null;
+  const { manifest, definition } = entry;
   const { x, y } = position;
-  const { width, height } = definition.contentSize;
-  const geometry = definition.geometry ?? "quad";
+  const { width, height } = manifest.contentSize;
+  const geometry = manifest.geometry;
   const vertices =
     geometry === "circle"
       ? [
@@ -120,12 +121,13 @@ export function createSpecial(kind: string, position: Point): SpecialMapping | n
           ];
   return {
     id: id(),
-    type: "special",
-    kind: definition.kind,
-    version: definition.version ?? 1,
-    name: nextName(`special:${definition.kind}`, definition.label),
-    color: { ...definition.defaultColor },
-    config: { ...definition.defaultConfig } as Record<string, unknown>,
+    type: "custom",
+    packageId: manifest.id,
+    packageVersion: manifest.version,
+    configVersion: manifest.configVersion,
+    name: nextName(`custom:${manifest.id}`, manifest.name),
+    color: { ...manifest.defaultColor },
+    config: { ...(definition?.defaultConfig ?? manifest.defaultConfig) } as Record<string, unknown>,
     vertices,
   };
 }

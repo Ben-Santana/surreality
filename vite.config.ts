@@ -29,6 +29,19 @@ export default defineConfig({
       preload: {
         input: path.join(root, "electron/preload.ts"),
         onstart: startElectron,
+        // Our windows use sandbox:false with context isolation. Electron only
+        // supports ESM imports (not require) in that preload configuration.
+        vite: {
+          build: {
+            rollupOptions: {
+              output: {
+                format: "es",
+                entryFileNames: "preload.mjs",
+                inlineDynamicImports: true,
+              },
+            },
+          },
+        },
       },
     }),
   ],

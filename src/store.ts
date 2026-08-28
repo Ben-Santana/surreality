@@ -3,7 +3,7 @@ import { createJSONStorage, persist, type StateStorage } from "zustand/middlewar
 import {
   createCircle,
   createPolygon,
-  createSpecial,
+  createCustomMapping,
   createSurface,
   createText,
   duplicateMapping,
@@ -46,7 +46,8 @@ import type {
 } from "./types";
 import { IDENTITY_SKEW, PANEL_SIZE } from "./types";
 
-import { listSpecialMappingChoices } from "./specials/registry";
+import { listCustomMappingChoices } from "./customMappings/registry";
+import { packageIdForLegacyKind } from "./customMappings/registry";
 
 type HistorySnapshot = {
   mappings: Mapping[];
@@ -69,10 +70,10 @@ type RoomState = {
   projectorOpen: boolean;
   panelLayout: PanelLayout | null;
   setPanelLayout: (layout: PanelLayout) => void;
-  setTool: (tool: Tool, specialKind?: string) => void;
-  specialKind: string;
-  setSpecialKind: (kind: string) => void;
-  addSpecial: (kind: string, position: Point) => void;
+  setTool: (tool: Tool, customMappingPackageId?: string) => void;
+  customMappingPackageId: string;
+  setCustomMappingPackage: (packageId: string) => void;
+  addCustomMapping: (packageId: string, position: Point) => void;
   setEditMode: (editMode: boolean) => void;
   toggleGrid: () => void;
   toggleSnapToGrid: () => void;
@@ -241,7 +242,8 @@ function normalizeSpaces(value: unknown): Space[] {
     if (typeof candidate.id !== "string" || typeof candidate.name !== "string") continue;
     if (!Array.isArray(candidate.mappings)) continue;
     const { surfaces, legacyIds } = normalizeSurfaces(candidate.surfaces);
-    const mappings = candidate.mappings.map((mapping) => {
+    const mappings = candidate.mappings.map((rawMapping) => {
+      const mapping = normalizeMapping(rawMapping);
       if (!mapping.surfaceId || !legacyIds.has(mapping.surfaceId)) return mapping;
       const surface = surfaceById(surfaces, mapping.surfaceId);
       if (!surface) return mapping;
@@ -256,6 +258,25 @@ function normalizeSpaces(value: unknown): Space[] {
     });
   }
   return spaces;
+}
+
+/** Convert the old in-app "special" shape without dropping user configuration. */
+function normalizeMapping(value: Mapping | Record<string, unknown>): Mapping {
+  const candidate = value as unknown as Record<string, unknown> & {
+    type: string;
+    kind?: string;
+    version?: number;
+  };
+  if (candidate.type !== "special") return value as Mapping;
+  const kind = typeof candidate.kind === "string" ? candidate.kind : "unknown";
+  const { kind: _kind, version: _version, ...mapping } = candidate;
+  return {
+    ...mapping,
+    type: "custom",
+    packageId: packageIdForLegacyKind(kind),
+    packageVersion: "1.0.0",
+    configVersion: typeof candidate.version === "number" ? candidate.version : 1,
+  } as unknown as Mapping;
 }
 
 export function isUntitledSpace(space: Space | null | undefined) {
@@ -378,7 +399,7 @@ export const useRoomStore = create<RoomState>()(
       snapToGrid: false,
       gridSize: "medium",
       tool: "select",
-      specialKind: listSpecialMappingChoices()[0]?.kind ?? "feynman",
+      customMappingPackageId: listCustomMappingChoices()[0]?.manifest.id ?? "room.mapping.feynman",
       contextMenu: null,
       projectorOpen: false,
       panelLayout: null,
@@ -386,13 +407,14 @@ export const useRoomStore = create<RoomState>()(
       activeSpaceId: null,
       spaceEntered: false,
       spaceNamePrompt: null,
-      setTool: (tool, specialKind) =>
+      setTool: (tool, customMappingPackageId) =>
         set({
           tool,
-          specialKind: specialKind ?? get().specialKind,
+          customMappingPackageId: customMappingPackageId ?? get().customMappingPackageId,
           editMode: true,
         }),
-      setSpecialKind: (kind) => set({ specialKind: kind, tool: "special", editMode: true }),
+      setCustomMappingPackage: (packageId) =>
+        set({ customMappingPackageId: packageId, tool: "custom", editMode: true }),
       setEditMode: (editMode) =>
         set({
           editMode,
@@ -445,8 +467,8 @@ export const useRoomStore = create<RoomState>()(
           editMode: true,
         });
       },
-      addSpecial: (kind, position) => {
-        const mapping = createSpecial(kind, position);
+      addCustomMapping: (packageId, position) => {
+        const mapping = createCustomMapping(packageId, position);
         if (!mapping) return;
         withHistory(set, get, {
           mappings: [...get().mappings, mapping],
@@ -468,7 +490,7 @@ export const useRoomStore = create<RoomState>()(
         if (tool === "polygon") get().addPolygon(position);
         if (tool === "circle") get().addCircle(position);
         if (tool === "text") get().addText(position);
-        if (tool === "special") get().addSpecial(get().specialKind, position);
+        if (tool === "custom") get().addCustomMapping(get().customMappingPackageId, position);
         if (tool === "surface") get().addSurface(position);
       },
       updateMapping: (id, patch) =>
@@ -846,7 +868,7 @@ export const useRoomStore = create<RoomState>()(
     }),
     {
       name: "projection-mapping-room",
-      version: 10,
+      version: 11,
       storage: createJSONStorage(() => debounceStorage(400)),
       partialize: (state) => {
         let spaces = state.spaces;
@@ -900,7 +922,9 @@ export const useRoomStore = create<RoomState>()(
             null,
         );
         let spaces = normalizeSpaces(data.spaces);
-        const liveMappings = Array.isArray(data.mappings) ? data.mappings : [];
+        const liveMappings = Array.isArray(data.mappings)
+          ? data.mappings.map((mapping) => normalizeMapping(mapping))
+          : [];
         if (liveMappings.length > 0 && !spaces.some((space) => snapshotEqual(space.mappings, liveMappings))) {
           const activeId =
             typeof data.activeSpaceId === "string" && spaces.some((space) => space.id === data.activeSpaceId)

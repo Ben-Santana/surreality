@@ -9,15 +9,17 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { centroid, isPolygonGeometry } from "../geometry";
-import { getSpecial } from "../specials/registry";
-import { definitionConfig } from "../specials/types";
+import { getCustomMapping, useCustomMappings } from "../customMappings/registry";
+import { customMappingConfig } from "../customMappings/config";
 import { useRoomStore } from "../store";
 import { DEFAULT_TEXT_FONT, TEXT_FONTS } from "../textFonts";
 import { displayVertices } from "../wall";
-import type { SpecialMapping, TextMapping } from "../types";
+import type { CustomMapping, TextMapping } from "../types";
 import ColorPicker from "./ColorPicker";
+import CustomMappingFrame from "./CustomMappingFrame";
 
 export default function Inspector() {
+  useCustomMappings();
   const mappings = useRoomStore((state) => state.mappings);
   const surfaces = useRoomStore((state) => state.surfaces);
   const selectedId = useRoomStore((state) => state.selectedId);
@@ -157,8 +159,8 @@ export default function Inspector() {
         </div>
       ) : null}
 
-      {selected.type === "special" ? (
-        <SpecialInspector mapping={selected} />
+      {selected.type === "custom" ? (
+        <CustomMappingInspector mapping={selected} />
       ) : null}
 
       {isPolygonGeometry(selected) ? (
@@ -207,21 +209,42 @@ export default function Inspector() {
   );
 }
 
-function SpecialInspector({ mapping }: { mapping: SpecialMapping }) {
+function CustomMappingInspector({ mapping }: { mapping: CustomMapping }) {
   const updateMapping = useRoomStore((state) => state.updateMapping);
-  const definition = getSpecial(mapping.kind);
-  if (!definition?.Inspector) {
+  const entry = getCustomMapping(mapping.packageId, mapping.packageVersion);
+  if (!entry) {
     return (
-      <p className="text-[13px] text-white/50">
-        {definition?.label ?? mapping.kind} has no extra settings.
-      </p>
+      <div className="border border-amber-400/30 bg-amber-400/5 p-3 text-[12px] text-amber-100">
+        <p className="font-medium">Missing custom mapping</p>
+        <p className="mt-1 break-all text-amber-100/60">{mapping.packageId}@{mapping.packageVersion}</p>
+        <p className="mt-2 text-amber-100/70">Install this package to restore its renderer and settings. Its saved configuration has been preserved.</p>
+      </div>
     );
+  }
+  const definition = entry.definition;
+  if (!definition) {
+    if (!entry.manifest.entrypoints.inspector) {
+      return <p className="text-[13px] text-white/50">{entry.manifest.name} has no extra settings.</p>;
+    }
+    return (
+      <div className="h-72 overflow-hidden border border-white/10 bg-black/30">
+        <CustomMappingFrame
+          mapping={mapping}
+          manifest={entry.manifest}
+          mode="inspector"
+          onConfigChange={(config) => updateMapping(mapping.id, { config })}
+        />
+      </div>
+    );
+  }
+  if (!definition.Inspector) {
+    return <p className="text-[13px] text-white/50">{entry.manifest.name} has no extra settings.</p>;
   }
   const InspectorFields = definition.Inspector;
   return (
     <InspectorFields
       mapping={mapping}
-      config={definitionConfig(definition, mapping)}
+      config={customMappingConfig(mapping)}
       onChange={(config, extra) =>
         updateMapping(mapping.id, {
           config: config as Record<string, unknown>,

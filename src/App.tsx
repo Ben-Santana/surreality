@@ -3,9 +3,10 @@ import Editor from "./components/Editor";
 import OutputView from "./components/OutputView";
 import ControlsWindow from "./components/ControlsWindow";
 import { useControlsSync } from "./controlsSync";
-import { useRuntimeSnapshots } from "./specials/RuntimeHosts";
+import { useRuntimeSnapshots } from "./customMappings/runtime";
 import { useRoomStore } from "./store";
 import { displayMappings } from "./wall";
+import { initializeCustomMappings } from "./customMappings/registry";
 
 export default function App() {
   const mode = new URLSearchParams(window.location.search).get("mode");
@@ -16,6 +17,10 @@ export default function App() {
   const surfaces = useRoomStore((state) => state.surfaces);
   const shown = useMemo(() => displayMappings(mappings, surfaces), [mappings, surfaces]);
   const runtime = useRuntimeSnapshots();
+
+  useEffect(() => {
+    void initializeCustomMappings();
+  }, []);
 
   useEffect(() => {
     if (output || controls) return;

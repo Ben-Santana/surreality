@@ -1,8 +1,4 @@
-import { createRequire } from "node:module";
-
-const { contextBridge, ipcRenderer } = createRequire(import.meta.url)(
-  "electron",
-) as typeof import("electron");
+import { contextBridge, ipcRenderer } from "electron";
 
 contextBridge.exposeInMainWorld("room", {
   getDisplays: () => ipcRenderer.invoke("displays"),
@@ -37,6 +33,13 @@ contextBridge.exposeInMainWorld("room", {
     const handler = () => callback();
     ipcRenderer.on("history-redo", handler);
     return () => ipcRenderer.removeListener("history-redo", handler);
+  },
+  listCustomMappings: () => ipcRenderer.invoke("custom-mappings:list"),
+  importCustomMapping: () => ipcRenderer.invoke("custom-mappings:import"),
+  onCustomMappingsChanged: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on("custom-mappings:changed", handler);
+    return () => ipcRenderer.removeListener("custom-mappings:changed", handler);
   },
   sync: (payload: unknown) => ipcRenderer.send("sync", payload),
   onSync: (callback: (payload: unknown) => void) => {

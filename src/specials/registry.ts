@@ -42,7 +42,7 @@ export function listSpecialMappingChoices(): SpecialDefinition[] {
 }
 
 export function activateSpecial(mapping: SpecialMapping): boolean {
-  const definition = getSpecial(mapping.kind);
+  const definition = getSpecial(mapping.packageId.startsWith("room.mapping.") ? mapping.packageId.slice("room.mapping.".length) : "");
   if (!definition?.interactive || !definition.onActivate) return false;
   definition.onActivate(mapping, definitionConfig(definition, mapping));
   return true;

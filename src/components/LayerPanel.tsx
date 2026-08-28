@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { rgbaCss } from "../geometry";
 import { useRoomStore } from "../store";
 import type { Mapping } from "../types";
-import { getSpecial } from "../specials/registry";
+import { getCustomMapping, useCustomMappings } from "../customMappings/registry";
 
 const MAPPING_MIME = "application/x-room-mapping";
 
@@ -19,8 +19,8 @@ function mappingIcon(mapping: Mapping, selected: boolean) {
   const className = `size-3.5 ${selected ? "text-white/80" : "text-zinc-400"}`;
   if (mapping.type === "circle") return <Circle className={className} />;
   if (mapping.type === "text") return <Type className={className} />;
-  if (mapping.type === "special") {
-    const Icon = getSpecial(mapping.kind)?.icon;
+  if (mapping.type === "custom") {
+    const Icon = getCustomMapping(mapping.packageId, mapping.packageVersion)?.definition?.icon;
     if (Icon) return <Icon className={className} />;
     return <Sparkles className={className} />;
   }
@@ -28,6 +28,7 @@ function mappingIcon(mapping: Mapping, selected: boolean) {
 }
 
 export default function LayerPanel() {
+  useCustomMappings();
   const mappings = useRoomStore((state) => state.mappings);
   const surfaces = useRoomStore((state) => state.surfaces);
   const selectedId = useRoomStore((state) => state.selectedId);
