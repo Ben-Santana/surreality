@@ -1,13 +1,27 @@
-import { Moon, Sun } from "lucide-react";
+import { Menu, Moon, Sun, X } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { pages, type DocPath, isCurrent } from "./nav";
 
 export function Layout({ path, children }: { path: DocPath; children: ReactNode }) {
   const [light, setLight] = useState(() => localStorage.getItem("mapping-docs-theme") === "light");
+  const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => {
     document.documentElement.dataset.theme = light ? "light" : "dark";
     localStorage.setItem("mapping-docs-theme", light ? "light" : "dark");
   }, [light]);
+  useEffect(() => setMenuOpen(false), [path]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    document.body.classList.add("menu-open");
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.classList.remove("menu-open");
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
 
   return (
     <div className="site-shell">
@@ -21,10 +35,13 @@ export function Layout({ path, children }: { path: DocPath; children: ReactNode 
           <button className="theme-toggle" onClick={() => setLight((value) => !value)} aria-label={`Use ${light ? "dark" : "light"} mode`}>
             {light ? <Moon size={15} /> : <Sun size={15} />}
           </button>
+          <button className="menu-toggle" type="button" onClick={() => setMenuOpen((value) => !value)} aria-expanded={menuOpen} aria-controls="site-navigation" aria-label={`${menuOpen ? "Close" : "Open"} navigation`}>
+            {menuOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
         </div>
       </header>
 
-      <aside className="rail" aria-label="Documentation navigation">
+      <aside className={`rail${menuOpen ? " is-open" : ""}`} id="site-navigation" aria-label="Documentation navigation">
         <p className="eyebrow">CONTENTS</p>
         <nav>
           {pages.map((item, index) => (
@@ -35,6 +52,7 @@ export function Layout({ path, children }: { path: DocPath; children: ReactNode 
         </nav>
         <div className="rail-note"><span>RISK MODEL</span><p>Mapping packages contain executable browser code. Install only what you trust.</p></div>
       </aside>
+      {menuOpen && <button className="menu-backdrop" type="button" onClick={() => setMenuOpen(false)} aria-label="Close navigation" />}
 
       <main>{children}</main>
     </div>
