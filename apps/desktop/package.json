@@ -1,0 +1,37 @@
+{
+  "name": "@projection-room/desktop",
+  "productName": "Projection Mapping Room",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "env -u ELECTRON_RUN_AS_NODE vite",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test tests/*.test.mjs",
+    "create:mapping": "node scripts/create-mapping.mjs",
+    "pack:mapping": "node scripts/pack-mapping.mjs",
+    "build:mappings": "node scripts/build-bundled-mappings.mjs",
+    "preview": "vite preview",
+    "start": "env -u ELECTRON_RUN_AS_NODE electron ."
+  },
+  "dependencies": {
+    "lucide-react": "^0.544.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.13",
+    "@types/node": "^24.5.2",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.3",
+    "electron": "^37.4.0",
+    "tailwindcss": "^4.1.13",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.6",
+    "vite-plugin-electron": "^0.29.0"
+  }
+}
