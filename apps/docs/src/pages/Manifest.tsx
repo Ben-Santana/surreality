@@ -28,7 +28,7 @@ const fields = [
   ["configVersion", "integer ≥ 1", "Required. Version of the persisted configuration object. Bump it when you change the shape of defaultConfig."],
   ["author", "object", "Optional. { name: string, url?: string }. The name appears in the install warning."],
   ["minimumAppVersion", "string", "Optional. Informational minimum host version. Not enforced by Format 01."],
-  ["geometry", "enum", "Required. quad, polygon, or circle. This is the surface the room warps onto a wall or object."],
+  ["geometry", "enum", "Required. quad, polygon, or circle. This is the surface Surreality warps onto a wall or object."],
   ["contentSize", "size", "Required. { width, height } with positive numbers no larger than 8192."],
   ["defaultColor", "RGBA", "Required. Channels r, g, b, a as numbers from 0 through 255."],
   ["defaultConfig", "object", "Required. Complete initial configuration. Must be a plain object, not an array."],
@@ -80,7 +80,7 @@ export function Manifest() {
       <h2>Geometry and size</h2>
       <p>
         <code>geometry</code> chooses the surface primitive. <code>contentSize</code> is the intrinsic pixel size of
-        the mapping view before warp. The room scales and distorts that rectangle (or polygon, or circle) onto the
+        the mapping view before warp. Surreality scales and distorts that rectangle (or polygon, or circle) onto the
         physical surface; your code draws into the unwarped content box.
       </p>
 

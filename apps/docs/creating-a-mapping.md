@@ -1,6 +1,6 @@
 # Creating a custom mapping
 
-Custom mappings are code-powered packages. They execute in a restricted browser iframe and communicate with Projection Mapping Room through a small message-based SDK. A package cannot import the editor, its Zustand store, Electron, or Node.js modules.
+Custom mappings are code-powered packages. They execute in a restricted browser iframe and communicate with Surreality through a small message-based SDK. A package cannot import the editor, its Zustand store, Electron, or Node.js modules.
 
 ## Create and package
 

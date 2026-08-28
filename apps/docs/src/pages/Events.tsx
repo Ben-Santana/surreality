@@ -70,7 +70,7 @@ export function Events() {
         </div>
       </div>
       <p>
-        Pointer activation is separate: declare <code>input:pointer</code> so the room treats the surface as
+        Pointer activation is separate: declare <code>input:pointer</code> so Surreality treats the surface as
         clickable and can emit <code>activate</code>. That does not grant access to raw pointer events on the editor
         chrome.
       </p>

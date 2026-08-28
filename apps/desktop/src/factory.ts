@@ -81,7 +81,7 @@ export function createText(position: Point): TextMapping {
     id: id(),
     type: "text",
     name: nextName("text", "Text"),
-    text: "Projection",
+    text: "Surreality",
     fontFamily: DEFAULT_TEXT_FONT,
     color: { r: 36, g: 36, b: 42, a: 240 },
     vertices: [

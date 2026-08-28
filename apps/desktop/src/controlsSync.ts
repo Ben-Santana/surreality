@@ -12,7 +12,7 @@ function snapshot() {
 export function useControlsSync(role: "editor" | "controls" | null) {
   useEffect(() => {
     if (!role) return;
-    const channel = new BroadcastChannel("projection-mapping-room-controls");
+    const channel = new BroadcastChannel("surreality-controls");
     let ready = role === "editor";
     const apply = (payload: unknown) => {
       if (!payload || typeof payload !== "object") return;

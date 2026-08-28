@@ -14,7 +14,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 const RENDERER_DIST = path.join(__dirname, "../dist");
 
-protocol.registerSchemesAsPrivileged([{ scheme: "room-mapping", privileges: { secure: true, standard: true, supportFetchAPI: true, corsEnabled: true } }]);
+protocol.registerSchemesAsPrivileged([{ scheme: "surreality", privileges: { secure: true, standard: true, supportFetchAPI: true, corsEnabled: true } }]);
 
 let editorWindow: ElectronWindow | null = null;
 let outputWindow: ElectronWindow | null = null;
@@ -208,7 +208,7 @@ function installMenu() {
 }
 
 app.whenReady().then(() => {
-  app.setName("Projection Mapping Room");
+  app.setName("Surreality");
   seedBundledCustomMappings(app, path.join(app.getAppPath(), "mappings"));
   installMenu();
   registerCustomMappingProtocol(app, protocol);
@@ -240,7 +240,7 @@ app.whenReady().then(() => {
     const options: OpenDialogOptions = {
       title: "Import Custom Mapping",
       properties: ["openFile"],
-      filters: [{ name: "Projection Room Mapping", extensions: ["mapping"] }],
+      filters: [{ name: "Surreality Mapping", extensions: ["mapping"] }],
     };
     const result = editorWindow
       ? await dialog.showOpenDialog(editorWindow, options)

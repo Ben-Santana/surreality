@@ -21,7 +21,7 @@ type MappingFrameMessage = {
 function frameUrl(manifest: CustomMappingPackageManifest, mode: Props["mode"]) {
   const id = encodeURIComponent(manifest.id);
   const version = encodeURIComponent(manifest.version);
-  return `room-mapping://package/${id}/${version}/__host__.html?mode=${mode}`;
+  return `surreality://package/${id}/${version}/__host__.html?mode=${mode}`;
 }
 
 function asConfig(value: unknown): Record<string, unknown> | null {
@@ -36,7 +36,7 @@ export default function CustomMappingFrame({ mapping, manifest, mode, onConfigCh
 
   const sendInit = () => {
     ref.current?.contentWindow?.postMessage({
-      source: "projection-room-host",
+      source: "surreality-host",
       type: "initialize",
       mode,
       mapping: {
@@ -55,7 +55,7 @@ export default function CustomMappingFrame({ mapping, manifest, mode, onConfigCh
     const onMessage = (browserEvent: MessageEvent<MappingFrameMessage>) => {
       if (browserEvent.source !== ref.current?.contentWindow) return;
       const message = browserEvent.data;
-      if (message?.source !== "projection-room-mapping") return;
+      if (message?.source !== "surreality-mapping") return;
       if (message.type === "ready") {
         setStatus("ready");
         sendInit();
@@ -84,7 +84,7 @@ export default function CustomMappingFrame({ mapping, manifest, mode, onConfigCh
   useEffect(() => {
     if (status === "ready") {
       ref.current?.contentWindow?.postMessage({
-        source: "projection-room-host",
+        source: "surreality-host",
         type: "update",
         mode,
         mapping: {
@@ -103,7 +103,7 @@ export default function CustomMappingFrame({ mapping, manifest, mode, onConfigCh
   useEffect(() => onCustomMappingEvent((event) => {
     if (event.targetId && event.targetId !== mapping.id) return;
     ref.current?.contentWindow?.postMessage({
-      source: "projection-room-host",
+      source: "surreality-host",
       type: "event",
       event,
     }, "*");
@@ -115,7 +115,7 @@ export default function CustomMappingFrame({ mapping, manifest, mode, onConfigCh
     if (!receivesInput || !manifest.permissions?.includes("input:keyboard")) return;
     const forward = (event: KeyboardEvent) => {
       ref.current?.contentWindow?.postMessage({
-        source: "projection-room-host",
+        source: "surreality-host",
         type: "input",
         input: {
           type: event.type,

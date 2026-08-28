@@ -27,10 +27,10 @@ const members = [
   ["mapping", "snapshot", "Instance identity, display name, color, live config, packageId, and packageVersion."],
   ["manifest", "Manifest", "The validated installed package manifest."],
   ["config", "object", "The current package-owned configuration (same object as mapping.config)."],
-  ["color", "RGBA", "The mapping color selected in the room."],
+  ["color", "RGBA", "The mapping color selected in Surreality."],
   ["assets.url(path)", "string", "Resolves a package-relative path against the mapping origin. Use this for images, fonts, and media you packed."],
   ["updateConfig(next)", "void", "Commit a complete configuration object. The editor records undo and fans the new config out to every frame. Inspectors should call this; mapping views should treat config as read-only."],
-  ["emit(event)", "void", "Send an activate, hit, or signal record to the room event bus. The host overwrites sourceId with this instance’s ID."],
+  ["emit(event)", "void", "Send an activate, hit, or signal record to the Surreality event bus. The host overwrites sourceId with this instance’s ID."],
   ["log(...values)", "void", "Write a package-prefixed message to developer tools."],
 ];
 
@@ -48,7 +48,7 @@ export function RuntimeApi() {
         <TriangleAlert size={16} />
         <p>
           <b>No privileged globals.</b> Node.js, Electron, the editor DOM, and its application store are unavailable.
-          Packages talk to the room only through this context and the event bus.
+          Packages talk to Surreality only through this context and the event bus.
         </p>
       </div>
 
@@ -72,7 +72,7 @@ export function RuntimeApi() {
 
       <h2>Assets</h2>
       <p>
-        Packaged files are served from the <code>room-mapping:</code> protocol. <code>assets.url("logo.png")</code>
+        Packaged files are served from the <code>surreality:</code> protocol. <code>assets.url("logo.png")</code>
         is the supported way to build a URL. Do not hard-code filesystem paths or <code>file:</code> URLs.
       </p>
 

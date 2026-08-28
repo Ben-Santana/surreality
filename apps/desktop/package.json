@@ -1,6 +1,6 @@
 {
-  "name": "@projection-room/desktop",
-  "productName": "Projection Mapping Room",
+  "name": "@surreality/desktop",
+  "productName": "Surreality",
   "version": "1.0.0",
   "private": true,
   "type": "module",

@@ -866,7 +866,7 @@ export const useRoomStore = create<RoomState>()(
       endHistoryGesture: () => clearCoalesce(),
     }),
     {
-      name: "projection-mapping-room",
+      name: "surreality",
       version: 11,
       storage: createJSONStorage(() => debounceStorage(400)),
       partialize: (state) => {

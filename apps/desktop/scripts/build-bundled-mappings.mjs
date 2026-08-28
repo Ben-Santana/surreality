@@ -2,12 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 
 const outputDirectory = path.resolve("mappings");
-const nativeEntrypoint = "// This package is rendered by Projection Mapping Room's native compatibility runtime.\nexport default function mount() {}\n";
+const nativeEntrypoint = "// This package is rendered by Surreality's native compatibility runtime.\nexport default function mount() {}\n";
 const common = {
   manifestVersion: 1,
   version: "1.0.0",
   configVersion: 1,
-  author: { name: "Projection Mapping Room" },
+  author: { name: "Surreality" },
   entrypoints: { mapping: "mapping.js" },
   bundled: true,
 };

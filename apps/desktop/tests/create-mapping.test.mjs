@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 import test from "node:test";
 
 test("mapping generator creates a code-powered package", () => {
-  const project = fs.mkdtempSync(path.join(os.tmpdir(), "projection-room-generator-"));
+  const project = fs.mkdtempSync(path.join(os.tmpdir(), "surreality-generator-"));
   const script = path.resolve("scripts/create-mapping.mjs");
   const result = spawnSync(process.execPath, [script, "test-light"], { cwd: project, encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
@@ -19,14 +19,14 @@ test("mapping generator creates a code-powered package", () => {
 });
 
 test("mapping generator refuses to overwrite an existing mapping", () => {
-  const project = fs.mkdtempSync(path.join(os.tmpdir(), "projection-room-generator-"));
+  const project = fs.mkdtempSync(path.join(os.tmpdir(), "surreality-generator-"));
   const script = path.resolve("scripts/create-mapping.mjs");
   assert.equal(spawnSync(process.execPath, [script, "safe"], { cwd: project }).status, 0);
   assert.notEqual(spawnSync(process.execPath, [script, "safe"], { cwd: project }).status, 0);
 });
 
 test("packer creates an importable mapping archive", () => {
-  const project = fs.mkdtempSync(path.join(os.tmpdir(), "projection-room-packer-"));
+  const project = fs.mkdtempSync(path.join(os.tmpdir(), "surreality-packer-"));
   const create = spawnSync(process.execPath, [path.resolve("scripts/create-mapping.mjs"), "packed"], { cwd: project, encoding: "utf8" });
   assert.equal(create.status, 0, create.stderr);
   const source = path.join(project, "custom-mappings/packed");
@@ -40,7 +40,7 @@ test("packer creates an importable mapping archive", () => {
 });
 
 test("installer validates, extracts, and lists a package", () => {
-  const project = fs.mkdtempSync(path.join(os.tmpdir(), "projection-room-installer-"));
+  const project = fs.mkdtempSync(path.join(os.tmpdir(), "surreality-installer-"));
   const source = path.join(project, "custom-mappings/installed");
   assert.equal(spawnSync(process.execPath, [path.resolve("scripts/create-mapping.mjs"), "installed"], { cwd: project }).status, 0);
   const archivePath = path.join(project, "installed.mapping");
@@ -55,8 +55,8 @@ test("installer validates, extracts, and lists a package", () => {
     const listed = api.listInstalledCustomMappings(app);
     let handler;
     api.registerCustomMappingProtocol(app, { handle: (_scheme, next) => { handler = next; } });
-    const host = await handler({ url: "room-mapping://package/local.installed/1.0.0/__host__.html?mode=mapping" });
-    const sourceFile = await handler({ url: "room-mapping://package/local.installed/1.0.0/mapping.js" });
+    const host = await handler({ url: "surreality://package/local.installed/1.0.0/__host__.html?mode=mapping" });
+    const sourceFile = await handler({ url: "surreality://package/local.installed/1.0.0/mapping.js" });
     process.stdout.write(JSON.stringify({
       preview: preview.id,
       installed: installed.manifest.id,

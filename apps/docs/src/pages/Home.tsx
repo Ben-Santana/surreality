@@ -17,7 +17,7 @@ export function Home({ path }: { path: DocPath }) {
         <div className="hero-copy">
           <p className="kicker"><span>EXTENSION</span> .mapping</p>
           <h1>Reality has too many rules<br /><i>Break a few</i></h1>
-          <p className="lede">A complete field guide to building portable, code-powered mappings for Projection Mapping Room.</p>
+          <p className="lede">A complete field guide to building portable, code-powered mappings for Surreality.</p>
           <div className="hero-actions">
             <a className="primary" href="#/quickstart">Build your first mapping <ArrowRight size={16} /></a>
             <a className="secondary" href="#/runtime-api">Explore the API</a>
@@ -28,7 +28,7 @@ export function Home({ path }: { path: DocPath }) {
 
       <section className="principles" aria-label="Package principles">
         <article><Code2 /><span>01</span><h3>Browser native</h3><p>Write standard ES modules with DOM, CSS, Canvas, WebGL, and browser media APIs.</p></article>
-        <article><Box /><span>02</span><h3>Geometry aware</h3><p>Choose a quad, polygon, or circle surface; the room handles projection and warping.</p></article>
+        <article><Box /><span>02</span><h3>Geometry aware</h3><p>Choose a quad, polygon, or circle surface; Surreality handles projection and warping.</p></article>
         <article><ShieldCheck /><span>03</span><h3>Explicitly sandboxed</h3><p>No Node, Electron, or editor internals. Capabilities are declared and reviewed at install.</p></article>
       </section>
 

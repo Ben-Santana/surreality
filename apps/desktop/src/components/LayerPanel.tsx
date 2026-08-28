@@ -13,7 +13,7 @@ import { useRoomStore } from "../store";
 import type { Mapping } from "../types";
 import { getCustomMapping, useCustomMappings } from "../customMappings/registry";
 
-const MAPPING_MIME = "application/x-room-mapping";
+const MAPPING_MIME = "application/x-surreality-mapping";
 
 function mappingIcon(mapping: Mapping, selected: boolean) {
   const className = `size-3.5 ${selected ? "text-white/80" : "text-zinc-400"}`;

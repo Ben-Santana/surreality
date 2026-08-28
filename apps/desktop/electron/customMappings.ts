@@ -227,7 +227,7 @@ function hostHtml(manifest: CustomMappingPackageManifest, mode: "mapping" | "ins
 const root = document.getElementById("root");
 let current = null;
 let api = null;
-const send = (type, payload = {}) => parent.postMessage({ source: "projection-room-mapping", type, ...payload }, "*");
+const send = (type, payload = {}) => parent.postMessage({ source: "surreality-mapping", type, ...payload }, "*");
 try {
   const module = await import(${JSON.stringify(`./${entry}`)});
   api = module.default ?? module;
@@ -238,7 +238,7 @@ try {
 }
 addEventListener("message", async (event) => {
   const message = event.data;
-  if (!message || message.source !== "projection-room-host") return;
+  if (!message || message.source !== "surreality-host") return;
   if (message.type === "event") {
     const handler = current?.onEvent ?? api?.onEvent;
     if (typeof handler === "function") await handler(message.event);
@@ -280,7 +280,7 @@ addEventListener("message", async (event) => {
 }
 
 export function registerCustomMappingProtocol(app: App, protocol: Protocol) {
-  protocol.handle("room-mapping", (request) => {
+  protocol.handle("surreality", (request) => {
     try {
       const url = new URL(request.url);
       const parts = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
@@ -290,7 +290,7 @@ export function registerCustomMappingProtocol(app: App, protocol: Protocol) {
       const manifest = validateManifest(JSON.parse(fs.readFileSync(manifestPath, "utf8")));
       const nonce = crypto.randomBytes(16).toString("base64");
       const network = manifest.permissions?.includes("network:fetch") ? "https: http:" : "";
-      const csp = `default-src 'none'; script-src room-mapping: 'nonce-${nonce}'; style-src room-mapping: 'unsafe-inline'; img-src room-mapping: data: blob:; media-src room-mapping: data: blob:; font-src room-mapping: data:; connect-src room-mapping: ${network}`;
+      const csp = `default-src 'none'; script-src surreality: 'nonce-${nonce}'; style-src surreality: 'unsafe-inline'; img-src surreality: data: blob:; media-src surreality: data: blob:; font-src surreality: data:; connect-src surreality: ${network}`;
       if (fileParts.join("/") === "__host__.html") {
         const requestedMode = url.searchParams.get("mode");
         const mode = requestedMode === "inspector" || requestedMode === "runtime" ? requestedMode : "mapping";

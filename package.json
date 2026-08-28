@@ -1,5 +1,5 @@
 {
-  "name": "projection-mapping-room",
+  "name": "surreality",
   "private": true,
   "scripts": {
     "bootstrap": "npm install --prefix apps/desktop && npm install --prefix apps/docs",

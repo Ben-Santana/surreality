@@ -50,7 +50,7 @@ export default function Editor() {
   useEffect(() => {
     document.documentElement.classList.remove("controls-detached");
     let popup: Window | null = null;
-    const lifecycle = new BroadcastChannel("projection-mapping-room-controls-lifecycle");
+    const lifecycle = new BroadcastChannel("surreality-controls-lifecycle");
     lifecycle.onmessage = (event: MessageEvent<unknown>) => {
       if (event.data === "opened") {
         document.documentElement.classList.add("controls-detached");

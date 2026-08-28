@@ -4,7 +4,7 @@ import { Pager } from "../Layout";
 const permissions = [
   ["network:fetch", "Active", "Allows HTTP and HTTPS connections. Adds https: and http: to the iframe connect-src CSP. Without this permission, fetch and WebSocket to the network are blocked."],
   ["input:keyboard", "Active", "Forwards sanitized keydown and keyup records to onInput. Does not expose the host DOM event."],
-  ["input:pointer", "Active", "Marks the mapping as interactive so the room can emit activate when the surface is used."],
+  ["input:pointer", "Active", "Marks the mapping as interactive so Surreality can emit activate when the surface is used."],
   ["events:room", "Active", "Declares that the package participates in semantic room events via emit and onEvent."],
   ["audio:play", "Reserved", "Declared for forward compatibility. Does not grant a host audio bridge; Web Audio inside the iframe still follows normal browser rules for the sandbox."],
   ["microphone:read", "Reserved", "Does not grant getUserMedia or browser microphone access."],
@@ -44,12 +44,12 @@ export function Permissions() {
       <h2>Content Security Policy</h2>
       <p>Format 01 applies this policy to the mapping frame (network sources appear only with <code>network:fetch</code>):</p>
       <pre className="doc-pre"><code>{`default-src 'none'
-script-src room-mapping: (plus a per-load nonce)
-style-src room-mapping: 'unsafe-inline'
-img-src room-mapping: data: blob:
-media-src room-mapping: data: blob:
-font-src room-mapping: data:
-connect-src room-mapping: [https: http:]`}</code></pre>
+script-src surreality: (plus a per-load nonce)
+style-src surreality: 'unsafe-inline'
+img-src surreality: data: blob:
+media-src surreality: data: blob:
+font-src surreality: data:
+connect-src surreality: [https: http:]`}</code></pre>
       <p>
         Inline styles are allowed so generated UI can set colors from <code>context.color</code>. External scripts
         from the network are not. Unknown permission strings fail manifest validation, so you cannot invent new

@@ -12,9 +12,9 @@ export function Layout({ path, children }: { path: DocPath; children: ReactNode 
   return (
     <div className="site-shell">
       <header className="topbar">
-        <a className="wordmark" href="#/" aria-label="Projection Mapping Room documentation home">
+        <a className="wordmark" href="#/" aria-label="Surreality documentation home">
           <span className="mark"><i /><i /><i /></span>
-          <span>ROOM</span><b>/</b><em>DEVELOPER</em>
+          <span>SURREALITY</span><b>/</b><em>DEVELOPER</em>
         </a>
         <div className="top-actions">
           <span className="version">FORMAT 01</span>

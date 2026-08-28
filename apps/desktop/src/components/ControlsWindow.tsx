@@ -18,7 +18,7 @@ export default function ControlsWindow() {
     window.close();
   };
   useEffect(() => {
-    const channel = new BroadcastChannel("projection-mapping-room-controls-lifecycle");
+    const channel = new BroadcastChannel("surreality-controls-lifecycle");
     channel.postMessage("opened");
     const closing = () => {
       window.opener?.postMessage({

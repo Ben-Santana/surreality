@@ -1,4 +1,4 @@
-# Projection Mapping Room
+# Surreality
 
 Two independent apps. Each has its own `package.json`, lockfile, and `node_modules`. Desktop is the heavier Electron editor; docs is a small static site.
 
