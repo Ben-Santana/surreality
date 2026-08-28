@@ -1,6 +1,6 @@
 import { Menu, Moon, Sun, X } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
-import { pages, type DocPath, isCurrent } from "./nav";
+import { pages, sections, type DocPath, isCurrent } from "./nav";
 
 export function Layout({ path, children }: { path: DocPath; children: ReactNode }) {
   const [light, setLight] = useState(() => localStorage.getItem("mapping-docs-theme") === "light");
@@ -44,13 +44,20 @@ export function Layout({ path, children }: { path: DocPath; children: ReactNode 
       <aside className={`rail${menuOpen ? " is-open" : ""}`} id="site-navigation" aria-label="Documentation navigation">
         <p className="eyebrow">CONTENTS</p>
         <nav>
-          {pages.map((item, index) => (
-            <a key={item.path} href={`#${item.path}`} aria-current={isCurrent(item.path, path) ? "page" : undefined}>
-              <span>{String(index + 1).padStart(2, "0")}</span>{item.label}
-            </a>
+          {sections.map((section) => (
+            <section className="nav-section" key={section.label}>
+              <h2>{section.label}</h2>
+              {section.pages.map((item) => {
+                const index = pages.findIndex((page) => page.path === item.path);
+                return (
+                  <a key={item.path} href={`#${item.path}`} aria-current={isCurrent(item.path, path) ? "page" : undefined}>
+                    <span>{String(index + 1).padStart(2, "0")}</span>{item.label}
+                  </a>
+                );
+              })}
+            </section>
           ))}
         </nav>
-        <div className="rail-note"><span>RISK MODEL</span><p>Browser mappings are sandboxed. Native plugins are trusted software with user-level system access.</p></div>
       </aside>
       {menuOpen && <button className="menu-backdrop" type="button" onClick={() => setMenuOpen(false)} aria-label="Close navigation" />}
 
