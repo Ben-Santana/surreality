@@ -31,7 +31,7 @@ export function Packaging() {
       <p className="eyebrow">REFERENCE</p>
       <h1>Packaging</h1>
       <p className="lede">
-        A <code>.mapping</code> file is a readable JSON archive: a manifest plus package files. The installer
+        A <code>.surreality</code> file is a readable JSON archive: one manifest plus browser code, assets, and optional native plugin files. The installer
         validates paths, entrypoints, identity, sizes, colors, permissions, and expanded content before extraction.
       </p>
 
@@ -44,18 +44,18 @@ export function Packaging() {
       <p>
         The generator writes a folder with <code>manifest.json</code>, <code>mapping.js</code>, and
         <code>inspector.js</code>. The packer walks that folder, skips <code>manifest.json</code>,
-        <code>node_modules</code>, dotfiles, and nested <code>.mapping</code> files, and encodes the rest as Base64.
-        Output defaults to <code>id-version.mapping</code> in the same folder.
+        <code>node_modules</code>, dotfiles, and nested package archives, and encodes the rest as Base64.
+        Output defaults to <code>id-version.surreality</code> in the same folder.
       </p>
       <p>
-        Install from <b>Add → Custom Mappings → Import .mapping…</b>. Remove an installed package with the trash
+        Install from <b>Add → Custom Mappings → Import package…</b>. Legacy <code>.mapping</code> archives remain importable. Remove an installed package with the trash
         control beside its name. Uninstall does not delete mapping objects from saved rooms.
       </p>
 
       <h2>Archive layout</h2>
       <div className="archive-tree">
         <FileArchive />
-        <b>com.example.neon-clock-1.0.0.mapping</b>
+        <b>com.example.neon-clock-1.0.0.surreality</b>
         <pre>{archive}</pre>
       </div>
       <p>
@@ -63,6 +63,9 @@ export function Packaging() {
         The host writes a canonical <code>manifest.json</code> into the installed directory; you do not need to pack
         one inside <code>files</code>.
       </p>
+      <h2>Suggested source layout</h2>
+      <pre className="doc-pre"><code>{`manifest.json\nmapping.js              # required sandboxed visual\ninspector.js            # optional editor UI\nruntime.js              # optional per-instance behavior\nassets/                  # images, fonts, media\nplugin/index.mjs         # optional privileged worker\nplugin/native/<platform> # optional SDK libraries/binaries`}</code></pre>
+      <p>The 50 MB limit applies to native dependencies too. Bundle only production files. The packer does not compile source, install dependencies, sign binaries, or choose platform builds for you.</p>
       <h2>Limits</h2>
       <div className="limits doc-limits">
         <div><p className="eyebrow">ARCHIVE + EXPANDED</p><strong>50 MB</strong><span>Both the file on disk and the decoded payload</span></div>

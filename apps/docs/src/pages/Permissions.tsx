@@ -10,6 +10,15 @@ const permissions = [
   ["microphone:read", "Reserved", "Does not grant getUserMedia or browser microphone access."],
   ["storage:package", "Reserved", "Does not grant host filesystem or durable package storage."],
   ["files:user-selected", "Reserved", "Does not open a host file picker yet."],
+  ["device:usb", "Native", "Declares direct USB device access by a privileged plugin."],
+  ["device:serial", "Native", "Declares serial-port access by a privileged plugin."],
+  ["device:camera", "Native", "Declares camera or depth-sensor access by a privileged plugin."],
+  ["device:midi", "Native", "Declares MIDI device access by a privileged plugin."],
+  ["network:listen", "Native", "Declares that a plugin may listen on a local network port."],
+  ["process:spawn", "Native", "Declares that a plugin may start other executables."],
+  ["background:run", "Native", "Declares work that continues while no mapping surface is visible."],
+  ["events:publish", "Native", "Declares plugin-to-mapping input publication."],
+  ["system:unrestricted", "Native", "Required by Format 02 plugin entrypoints. Grants user-level native access; this is not sandboxed."],
 ];
 
 export function Permissions() {
@@ -18,13 +27,13 @@ export function Permissions() {
       <p className="eyebrow">REFERENCE</p>
       <h1>Permissions</h1>
       <p className="lede">
-        Requested capabilities are listed in the installation warning. A declaration communicates intent. It never
-        creates Node or Electron access, and reserved names do not silently unlock browser APIs.
+        Requested capabilities are listed in the installation warning. Browser permissions alter a restricted frame.
+        Native permissions explain what a trusted plugin intends to do; Format 02 does not yet enforce them individually.
       </p>
 
       <h2>Install warning</h2>
       <p>
-        Before a <code>.mapping</code> file is extracted, the user sees the package author (or “its publisher”) and
+        Before a <code>.surreality</code> file is extracted, the user sees the package author (or “its publisher”) and
         every requested capability. Empty <code>permissions</code> is shown as “No optional capabilities.” Treat that
         dialog as part of the product: only ask for what the mapping actually uses.
       </p>
@@ -42,7 +51,7 @@ export function Permissions() {
       </div>
 
       <h2>Content Security Policy</h2>
-      <p>Format 01 applies this policy to the mapping frame (network sources appear only with <code>network:fetch</code>):</p>
+      <p>Format 02 applies this policy to browser frames (network sources appear only with <code>network:fetch</code>):</p>
       <pre className="doc-pre"><code>{`default-src 'none'
 script-src surreality: (plus a per-load nonce)
 style-src surreality: 'unsafe-inline'
@@ -58,9 +67,9 @@ connect-src surreality: [https: http:]`}</code></pre>
 
       <h2>Trust model</h2>
       <p>
-        Installed code is still untrusted visual and behavioral content. A familiar file extension is not a reason
-        to install a package. Capabilities you grant can be misused inside the sandbox (misleading UI, unexpected
-        network calls, noisy events). Install only publishers you trust.
+        Browser-only packages can still mislead users or misuse granted network access. Packages with a plugin
+        entrypoint are fully trusted native software: process separation protects Surreality from crashes, not the
+        user from malicious code. Review the publisher and requested capabilities before installing.
       </p>
 
       <Pager path="/permissions" />

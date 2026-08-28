@@ -8,12 +8,14 @@ import { Manifest } from "./pages/Manifest";
 import { Packaging } from "./pages/Packaging";
 import { Permissions } from "./pages/Permissions";
 import { RuntimeApi } from "./pages/RuntimeApi";
+import { Plugins } from "./pages/Plugins";
 
 function page(path: DocPath) {
   if (path === "/" || path === "/quickstart") return <Home path={path} />;
   if (path === "/manifest") return <Manifest />;
   if (path === "/runtime-api") return <RuntimeApi />;
   if (path === "/entrypoints") return <Entrypoints />;
+  if (path === "/plugins") return <Plugins />;
   if (path === "/events") return <Events />;
   if (path === "/permissions") return <Permissions />;
   return <Packaging />;

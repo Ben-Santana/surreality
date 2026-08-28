@@ -1,7 +1,7 @@
 import { CodeBlock, Pager } from "../Layout";
 
 const example = `{
-  "manifestVersion": 1,
+  "manifestVersion": 2,
   "id": "com.example.neon-clock",
   "name": "Neon Clock",
   "version": "1.0.0",
@@ -14,25 +14,26 @@ const example = `{
   "defaultConfig": { "label": "ROOM 02" },
   "entrypoints": {
     "mapping": "mapping.js",
-    "inspector": "inspector.js"
+    "inspector": "inspector.js",
+    "runtime": "runtime.js"
   },
   "permissions": []
 }`;
 
 const fields = [
-  ["manifestVersion", "1", "Required. Package schema. Currently must be exactly 1."],
+  ["manifestVersion", "1 | 2", "Required. Use 2 for .surreality packages and every package with a native plugin. Version 1 remains accepted for legacy browser-only mappings."],
   ["id", "string", "Required. Lowercase reverse-domain identifier matching /^[a-z0-9]+(?:[._-][a-z0-9]+)+$/."],
   ["version", "semver", "Required. Immutable release version: major.minor.patch with optional pre-release or build metadata."],
   ["name", "string", "Required. Display name, 1–80 characters after trim."],
   ["description", "string", "Required. Up to 500 characters. Shown during install."],
   ["configVersion", "integer ≥ 1", "Required. Version of the persisted configuration object. Bump it when you change the shape of defaultConfig."],
   ["author", "object", "Optional. { name: string, url?: string }. The name appears in the install warning."],
-  ["minimumAppVersion", "string", "Optional. Informational minimum host version. Not enforced by Format 01."],
+  ["minimumAppVersion", "string", "Optional. Informational minimum host version. Not enforced by Format 02."],
   ["geometry", "enum", "Required. quad, polygon, or circle. This is the surface Surreality warps onto a wall or object."],
   ["contentSize", "size", "Required. { width, height } with positive numbers no larger than 8192."],
   ["defaultColor", "RGBA", "Required. Channels r, g, b, a as numbers from 0 through 255."],
   ["defaultConfig", "object", "Required. Complete initial configuration. Must be a plain object, not an array."],
-  ["entrypoints", "paths", "Required. mapping is required. inspector and runtime are optional relative paths."],
+  ["entrypoints", "paths", "Required. mapping is required. inspector, runtime, and plugin are optional relative paths. plugin requires Format 02 and system:unrestricted."],
   ["permissions", "string[]", "Optional. Declared capabilities. Unknown strings fail validation."],
   ["thumbnail", "path", "Optional. Package-relative image path. Must pass the same path safety rules as entrypoints."],
 ];
@@ -69,6 +70,9 @@ export function Manifest() {
         uninstalled, the mapping remains as a placeholder and its configuration is preserved until you reinstall the
         same identity.
       </p>
+
+      <h2>Browser-only and native packages</h2>
+      <p>A browser-only package declares mapping, inspector, and runtime entrypoints. These run in restricted frames. Adding <code>entrypoints.plugin</code> turns the same archive into a privileged extension as well; it must use manifest version 2 and request <code>system:unrestricted</code>. See <a href="#/plugins">Native plugins</a> before choosing that trust level.</p>
 
       <h2>Paths</h2>
       <p>

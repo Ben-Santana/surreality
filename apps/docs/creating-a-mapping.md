@@ -1,6 +1,6 @@
-# Creating a custom mapping
+# Creating a Surreality package
 
-Custom mappings are code-powered packages. They execute in a restricted browser iframe and communicate with Surreality through a small message-based SDK. A package cannot import the editor, its Zustand store, Electron, or Node.js modules.
+Surreality uses one `.surreality` package for projected visuals, inspectors, per-instance behavior, assets, and optional native device integrations. Browser entrypoints execute in restricted iframes. A privileged plugin entrypoint runs in a separate native worker only after an explicit install warning.
 
 ## Create and package
 
@@ -9,15 +9,15 @@ npm run create:mapping -- neon-clock
 npm run pack:mapping -- ./custom-mappings/neon-clock
 ```
 
-The first command creates a manifest, mapping renderer, and inspector. The second creates a `.mapping` file that can be installed from **Add → Custom Mappings → Import .mapping…**.
+The first command creates a manifest, mapping renderer, and inspector. The second creates a `.surreality` file that can be installed from **Add → Custom Mappings → Import .surreality…**.
 
-A `.mapping` file is a JSON archive containing the validated manifest and base64-encoded package files. This deliberately keeps the first package format auditable and dependency-free. Published versions are immutable. Uninstalling a package does not delete mapping objects from saved rooms; reinstall the same package and version to render them again.
+A `.surreality` file is a JSON archive containing the validated manifest and base64-encoded package files. Published versions are immutable. Uninstalling a package does not delete mapping objects from saved rooms; reinstall the same package and version to render them again. Legacy `.mapping` files remain importable.
 
 ## Manifest
 
 ```json
 {
-  "manifestVersion": 1,
+  "manifestVersion": 2,
   "id": "com.example.neon-clock",
   "name": "Neon Clock",
   "version": "1.0.0",
@@ -86,6 +86,9 @@ type MappingContext = {
   assets: { url(relativePath: string): string };
   updateConfig(config: Record<string, unknown>): void;
   emit(event: MappingEvent): void;
+  inputs: {
+    subscribe(channel: string, listener: (data: unknown) => void): () => void;
+  };
   log(...values: unknown[]): void;
 };
 ```
@@ -108,6 +111,46 @@ context.emit({
 ```
 
 Supported event types are `activate`, `hit`, and `signal`. The host always replaces an emitted event's `sourceId` with the sending mapping instance ID.
+
+## Native plugins and devices
+
+Add an ES module plugin to the same package when a mapping needs Kinect, USB, serial, MIDI, a native SDK, files, processes, or a local server:
+
+```json
+{
+  "entrypoints": {
+    "mapping": "mapping.js",
+    "plugin": "plugin/index.mjs"
+  },
+  "permissions": [
+    "device:usb",
+    "background:run",
+    "events:publish",
+    "system:unrestricted"
+  ]
+}
+```
+
+```js
+// plugin/index.mjs
+export default async function activate(context) {
+  const device = await openDeviceWithItsNativeSdk();
+  device.on("body", body => context.publish("body-tracking", body));
+  return () => device.close();
+}
+```
+
+```js
+// mapping.js or runtime.js
+const unsubscribe = context.inputs.subscribe(
+  "com.example.kinect/body-tracking",
+  frame => renderBodies(frame)
+);
+```
+
+Plugin channels are exposed as `package-id/channel`. One worker runs per installed package version and can serve every mapping instance. The plugin may return a cleanup function or an object with `deactivate()`.
+
+Format 02 requires `system:unrestricted` for a plugin entrypoint. Device-specific permissions currently communicate intent during installation; they are not individually enforced. The worker is process-isolated for crash containment, but has the same user-level system access as Surreality. Bundle production dependencies and architecture-specific native libraries. OS drivers, administrator prompts, code signing, and privacy approval cannot be bypassed by the package.
 
 ## Security and compatibility
 

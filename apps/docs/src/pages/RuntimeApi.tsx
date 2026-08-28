@@ -18,6 +18,9 @@ const contextType = `type MappingContext = {
   assets: { url(relativePath: string): string };
   updateConfig(config: Record<string, unknown>): void;
   emit(event: MappingEvent): void;
+  inputs: {
+    subscribe(channel: string, listener: (data: unknown) => void): () => void;
+  };
   log(...values: unknown[]): void;
 };`;
 
@@ -31,6 +34,7 @@ const members = [
   ["assets.url(path)", "string", "Resolves a package-relative path against the mapping origin. Use this for images, fonts, and media you packed."],
   ["updateConfig(next)", "void", "Commit a complete configuration object. The editor records undo and fans the new config out to every frame. Inspectors should call this; mapping views should treat config as read-only."],
   ["emit(event)", "void", "Send an activate, hit, or signal record to the Surreality event bus. The host overwrites sourceId with this instance’s ID."],
+  ["inputs.subscribe(channel, listener)", "unsubscribe", "Receive data published by a privileged plugin. Channels are namespaced as package-id/channel."],
   ["log(...values)", "void", "Write a package-prefixed message to developer tools."],
 ];
 

@@ -31,7 +31,7 @@ export function Layout({ path, children }: { path: DocPath; children: ReactNode 
           <span>SURREALITY</span><b>/</b><em>DEVELOPER</em>
         </a>
         <div className="top-actions">
-          <span className="version">FORMAT 01</span>
+          <span className="version">FORMAT 02</span>
           <button className="theme-toggle" onClick={() => setLight((value) => !value)} aria-label={`Use ${light ? "dark" : "light"} mode`}>
             {light ? <Moon size={15} /> : <Sun size={15} />}
           </button>
@@ -50,7 +50,7 @@ export function Layout({ path, children }: { path: DocPath; children: ReactNode 
             </a>
           ))}
         </nav>
-        <div className="rail-note"><span>RISK MODEL</span><p>Mapping packages contain executable browser code. Install only what you trust.</p></div>
+        <div className="rail-note"><span>RISK MODEL</span><p>Browser mappings are sandboxed. Native plugins are trusted software with user-level system access.</p></div>
       </aside>
       {menuOpen && <button className="menu-backdrop" type="button" onClick={() => setMenuOpen(false)} aria-label="Close navigation" />}
 

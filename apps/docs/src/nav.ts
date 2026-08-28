@@ -4,6 +4,7 @@ export const pages = [
   { path: "/manifest", label: "Manifest" },
   { path: "/runtime-api", label: "Runtime API" },
   { path: "/entrypoints", label: "Entrypoints" },
+  { path: "/plugins", label: "Native plugins" },
   { path: "/events", label: "Events" },
   { path: "/permissions", label: "Permissions" },
   { path: "/packaging", label: "Packaging" },

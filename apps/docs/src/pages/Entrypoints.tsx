@@ -1,4 +1,4 @@
-import { Braces, Code2, Cpu } from "lucide-react";
+import { Braces, Code2, Cpu, Plug } from "lucide-react";
 import { CodeBlock, Pager } from "../Layout";
 
 const mountExample = `export default function mount(context) {
@@ -19,8 +19,8 @@ export function Entrypoints() {
       <p className="eyebrow">REFERENCE</p>
       <h1>Entrypoints</h1>
       <p className="lede">
-        Entrypoints are standard browser ES modules. Export a mount function. The host remounts mapping and runtime
-        views when state changes; inspectors stay mounted while you edit.
+        One package can contain three browser entrypoints and an optional native plugin. Browser modules export a
+        mount function; the plugin exports an activation function and runs under a different trust model.
       </p>
 
       <h2>The three modules</h2>
@@ -28,6 +28,7 @@ export function Entrypoints() {
         <article><b>01</b><Code2 /><h3>mapping.js</h3><p>Required. Renders one instance inside its projected geometry. Draw with DOM, Canvas, WebGL, SVG, or CSS.</p><small>Visual surface</small></article>
         <article><b>02</b><Braces /><h3>inspector.js</h3><p>Optional. Builds controls in the editor and commits complete configuration objects with updateConfig.</p><small>Editor panel</small></article>
         <article><b>03</b><Cpu /><h3>runtime.js</h3><p>Optional. Runs once per instance without drawing on the mapping surface. Use it for simulation, audio, or coordination.</p><small>Behavior host</small></article>
+        <article><b>04</b><Plug /><h3>plugin/index.mjs</h3><p>Optional. Runs once per installed package in a separate native worker. Use it for devices and OS integrations.</p><small>Privileged worker</small></article>
       </div>
 
       <h2>Mount function</h2>
@@ -64,6 +65,7 @@ export function Entrypoints() {
         DOM, CSS, Canvas, WebGL, and in-package media are all valid. Bundle dependencies into ES modules; there is
         no Node resolver at runtime. Keep every import and asset path relative to the package.
       </p>
+      <p>Browser entrypoints cannot import Node modules, open USB devices, or inspect the editor. Put native work in a <a href="#/plugins">plugin entrypoint</a> and send only the data your visuals need through named input channels.</p>
 
       <Pager path="/entrypoints" />
     </article>
