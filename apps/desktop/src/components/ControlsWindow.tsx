@@ -2,6 +2,7 @@ import { ArrowLeft, PanelTopClose } from "lucide-react";
 import { useEffect } from "react";
 import { spaceLabel, useRoomStore } from "../store";
 import RoomPanel from "./RoomPanel";
+import InlineSpaceName from "./InlineSpaceName";
 
 export default function ControlsWindow() {
   const mappings = useRoomStore((state) => state.mappings);
@@ -23,6 +24,7 @@ export default function ControlsWindow() {
     window.close();
   };
   const showSpaces = () => {
+    window.localStorage.removeItem("surreality-library-view");
     returnToSpacePicker();
     window.opener?.postMessage({ type: "room-controls-show-spaces", bounds: bounds() }, "*");
     window.close();
@@ -50,23 +52,21 @@ export default function ControlsWindow() {
     };
   }, []);
   return (
-    <div className="editor-panel flex h-screen flex-col bg-[#111114] text-white">
-      <header className="drag-region flex h-10 shrink-0 items-center border-b border-white/10 px-3">
+    <div className="app-chrome editor-panel flex h-screen flex-col bg-[#111114] text-white">
+      <header className="drag-region relative flex h-10 shrink-0 items-center border-b border-white/10 px-3">
         <button
           type="button"
           title="Back to all spaces"
           aria-label={`Back to all spaces from ${spaceLabel(activeSpace)}`}
-          className="group no-drag relative block h-4 min-w-[132px] max-w-52 overflow-hidden text-left outline-none focus-visible:ring-1 focus-visible:ring-accent/70"
+          className="no-drag flex h-8 items-center gap-1.5 text-[11px] text-white/55 outline-none transition hover:text-white focus-visible:ring-1 focus-visible:ring-accent/70"
           onClick={showSpaces}
         >
-          <span className="chrome-label block truncate leading-4 transition-transform duration-200 ease-out group-hover:-translate-y-full group-focus-visible:-translate-y-full">
-            {spaceLabel(activeSpace)}
-          </span>
-          <span className="absolute left-0 top-full flex items-center gap-2 font-mono text-[11px] uppercase leading-4 tracking-[0.22em] text-white transition-transform duration-200 ease-out group-hover:-translate-y-full group-focus-visible:-translate-y-full">
-            <ArrowLeft className="size-3 shrink-0" />
-            <span>All spaces</span>
-          </span>
+          <ArrowLeft className="size-3 shrink-0" />
+          <span>All spaces</span>
         </button>
+        <div className="absolute left-1/2 w-[42%] -translate-x-1/2 text-center">
+          <InlineSpaceName className="chrome-label w-full leading-4" />
+        </div>
         <span className="ml-auto font-mono text-[11px] tracking-widest text-accent">
           {String(mappings.length).padStart(2, "0")}
         </span>

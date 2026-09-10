@@ -128,15 +128,28 @@ type RoomState = {
   endHistoryGesture: () => void;
 };
 
-function debounceStorage(delay: number): StateStorage {
-  let timer: ReturnType<typeof setTimeout> | undefined;
+function durableStorage(): StateStorage {
   return {
-    getItem: (name) => localStorage.getItem(name),
-    setItem: (name, value) => {
-      clearTimeout(timer);
-      timer = setTimeout(() => localStorage.setItem(name, value), delay);
+    getItem: async (name) => {
+      if (!window.room) return localStorage.getItem(name);
+      const durable = await window.room.persistence.getItem(name);
+      if (durable != null) return durable;
+      const legacy = localStorage.getItem(name);
+      if (legacy != null) {
+        // Keep a rollback copy while the new SQLite store proves itself across
+        // releases. Future writes go only to the durable main-process store.
+        localStorage.setItem(`${name}-legacy-backup`, legacy);
+        window.room.persistence.setItem(name, legacy);
+      }
+      return legacy;
     },
-    removeItem: (name) => localStorage.removeItem(name),
+    setItem: (name, value) => {
+      if (window.room) window.room.persistence.setItem(name, value);
+      else localStorage.setItem(name, value);
+    },
+    removeItem: (name) => {
+      localStorage.removeItem(name);
+    },
   };
 }
 
@@ -904,7 +917,7 @@ export const useRoomStore = create<RoomState>()(
     {
       name: "surreality",
       version: 11,
-      storage: createJSONStorage(() => debounceStorage(400)),
+      storage: createJSONStorage(() => durableStorage()),
       partialize: (state) => {
         let spaces = state.spaces;
         const active = spaces.find((space) => space.id === state.activeSpaceId);

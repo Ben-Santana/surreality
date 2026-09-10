@@ -43,6 +43,56 @@ contextBridge.exposeInMainWorld("room", {
     ipcRenderer.on("custom-mappings:changed", handler);
     return () => ipcRenderer.removeListener("custom-mappings:changed", handler);
   },
+  persistence: {
+    getItem: (name: string) => ipcRenderer.invoke("persistence:get", name),
+    setItem: (name: string, value: string) => ipcRenderer.send("persistence:put", name, value),
+    flush: () => ipcRenderer.invoke("persistence:flush"),
+  },
+  importAsset: (kind: "media" | "audio") => ipcRenderer.invoke("assets:import", kind),
+  cloud: {
+    configure: (url: string, publishableKey: string) => ipcRenderer.invoke("cloud:configure", url, publishableKey),
+    getState: () => ipcRenderer.invoke("cloud:state"),
+    signUp: (email: string, password: string) => ipcRenderer.invoke("cloud:sign-up", email, password),
+    signIn: (email: string, password: string) => ipcRenderer.invoke("cloud:sign-in", email, password),
+    signOut: () => ipcRenderer.invoke("cloud:sign-out"),
+    sendPasswordReset: (email: string) => ipcRenderer.invoke("cloud:password-reset", email),
+    recoverPassword: (email: string, token: string, newPassword: string) => ipcRenderer.invoke("cloud:password-recover", email, token, newPassword),
+    onState: (callback: (state: unknown) => void) => {
+      const handler = (_event: unknown, state: unknown) => callback(state);
+      ipcRenderer.on("cloud:state", handler);
+      return () => ipcRenderer.removeListener("cloud:state", handler);
+    },
+  },
+  community: {
+    browse: (options: unknown) => ipcRenderer.invoke("community:browse", options),
+    getPackage: (packageId: string) => ipcRenderer.invoke("community:get-package", packageId),
+    listDownloads: () => ipcRenderer.invoke("community:list-downloads"),
+    listSaved: () => ipcRenderer.invoke("community:list-saved"),
+    listUploads: () => ipcRenderer.invoke("community:list-uploads"),
+    listModerationQueue: () => ipcRenderer.invoke("community:list-moderation"),
+    setUsername: (username: string) => ipcRenderer.invoke("community:set-username", username),
+    uploadFromFile: () => ipcRenderer.invoke("community:upload"),
+    chooseThumbnail: () => ipcRenderer.invoke("community:choose-thumbnail"),
+    updateListing: (releaseId: string, listing: unknown) => ipcRenderer.invoke("community:update-listing", releaseId, listing),
+    downloadAndInstall: (releaseId: string) => ipcRenderer.invoke("community:download-install", releaseId),
+    report: (releaseId: string, reason: string) => ipcRenderer.invoke("community:report", releaseId, reason),
+    setSaved: (releaseId: string, saved: boolean) => ipcRenderer.invoke("community:set-saved", releaseId, saved),
+    takeDown: (releaseId: string, reason?: string) => ipcRenderer.invoke("community:moderate", releaseId, "take_down", reason),
+    restore: (releaseId: string) => ipcRenderer.invoke("community:moderate", releaseId, "restore"),
+    approve: (releaseId: string) => ipcRenderer.invoke("community:moderate", releaseId, "approve"),
+    reject: (releaseId: string, reason: string) => ipcRenderer.invoke("community:moderate", releaseId, "reject", reason),
+    onProgress: (callback: (progress: unknown) => void) => {
+      const handler = (_event: unknown, progress: unknown) => callback(progress);
+      ipcRenderer.on("community:progress", handler);
+      return () => ipcRenderer.removeListener("community:progress", handler);
+    },
+    open: () => ipcRenderer.send("community:open"),
+    onOpen: (callback: () => void) => {
+      const handler = () => callback();
+      ipcRenderer.on("community:open", handler);
+      return () => ipcRenderer.removeListener("community:open", handler);
+    },
+  },
   onPluginData: (callback: (payload: unknown) => void) => {
     const handler = (_event: unknown, payload: unknown) => callback(payload);
     ipcRenderer.on("plugin:data", handler);

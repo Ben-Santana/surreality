@@ -7,6 +7,8 @@ import RoomPanel from "./RoomPanel";
 import SpaceNameDialog from "./SpaceNameDialog";
 import SpacePicker from "./SpacePicker";
 import Stage from "./Stage";
+import Toolbar from "./Toolbar";
+import InlineSpaceName from "./InlineSpaceName";
 import { CustomMappingRuntimeHosts } from "../customMappings/runtime";
 
 function isTypingTarget(target: EventTarget | null) {
@@ -16,6 +18,12 @@ function isTypingTarget(target: EventTarget | null) {
 }
 
 export default function Editor() {
+  const [minimized, setMinimized] = useState(false);
+  useEffect(() => {
+    const expand = () => setMinimized(false);
+    window.addEventListener("surreality-open-custom-mappings", expand);
+    return () => window.removeEventListener("surreality-open-custom-mappings", expand);
+  }, []);
   const [controlsDetached, setControlsDetached] = useState(false);
   const mappings = useRoomStore((state) => state.mappings);
   const spaces = useRoomStore((state) => state.spaces);
@@ -35,6 +43,15 @@ export default function Editor() {
   const undo = useRoomStore((state) => state.undo);
   const redo = useRoomStore((state) => state.redo);
   const activeSpace = spaces.find((space) => space.id === activeSpaceId);
+  const showAllSpaces = () => {
+    window.localStorage.removeItem("surreality-library-view");
+    returnToSpacePicker();
+  };
+
+  useEffect(() => window.room?.community.onOpen(() => {
+    window.localStorage.setItem("surreality-library-view", "discover");
+    returnToSpacePicker();
+  }), [returnToSpacePicker]);
 
   const detachControls = (bounds?: { x: number; y: number; width: number; height: number }) => {
     const url = new URL(window.location.href);
@@ -94,6 +111,7 @@ export default function Editor() {
       document.documentElement.classList.remove("controls-detached");
       setControlsDetached(false);
       if (message.type === "room-controls-show-spaces") {
+        window.localStorage.removeItem("surreality-library-view");
         useRoomStore.getState().returnToSpacePicker();
       }
     };
@@ -182,7 +200,7 @@ export default function Editor() {
       if (event.key.toLowerCase() === "p") setTool("polygon");
       if (event.key.toLowerCase() === "c") setTool("circle");
       if (event.key.toLowerCase() === "t") setTool("text");
-      if (event.key.toLowerCase() === "m") setTool("custom");
+      if (event.key.toLowerCase() === "m") window.dispatchEvent(new Event("surreality-open-custom-mappings"));
       if (event.key.toLowerCase() === "g") toggleGrid();
     };
 
@@ -211,7 +229,7 @@ export default function Editor() {
   ]);
 
   return (
-    <div className="relative h-screen bg-black">
+    <div className="app-chrome relative h-screen bg-black">
       <CustomMappingRuntimeHosts />
       {editMode ? (
         <div className="drag-region pointer-events-auto absolute left-0 top-0 z-50 h-12 w-[88px]" />
@@ -220,25 +238,28 @@ export default function Editor() {
       {spaceEntered && editMode && !controlsDetached ? (
         <FloatingPanel
           title={
+            <InlineSpaceName className="chrome-label w-full leading-4" />
+          }
+          leading={
             <button
               type="button"
               title="Back to all spaces"
               aria-label={`Back to all spaces from ${spaceLabel(activeSpace)}`}
-              className="group no-drag relative block h-4 min-w-[132px] max-w-52 overflow-hidden text-left outline-none focus-visible:ring-1 focus-visible:ring-accent/70"
+              className="no-drag flex h-8 items-center gap-1.5 px-1 text-[11px] text-white/55 outline-none transition hover:text-white focus-visible:ring-1 focus-visible:ring-accent/70"
               onPointerDown={(event) => event.stopPropagation()}
-              onClick={returnToSpacePicker}
+              onClick={showAllSpaces}
             >
-              <span className="chrome-label block truncate leading-4 transition-transform duration-200 ease-out group-hover:-translate-y-full group-focus-visible:-translate-y-full">
-                {spaceLabel(activeSpace)}
-              </span>
-              <span className="absolute left-0 top-full flex items-center gap-2 font-mono text-[11px] uppercase leading-4 tracking-[0.22em] text-white transition-transform duration-200 ease-out group-hover:-translate-y-full group-focus-visible:-translate-y-full">
-                <ArrowLeft className="size-3 shrink-0" />
-                <span>All spaces</span>
-              </span>
+              <ArrowLeft className="size-3 shrink-0" />
+              <span>All spaces</span>
             </button>
           }
           className="embedded-room-panel"
           onDetach={detachControls}
+          minimized={minimized}
+          onMinimizedChange={setMinimized}
+          compactToolbar={<Toolbar compact onOpenCustomMappings={() => {
+            window.dispatchEvent(new Event("surreality-open-custom-mappings"));
+          }} />}
           accessory={
             <span className="font-mono text-[11px] tracking-widest text-accent">
               {String(mappings.length).padStart(2, "0")}

@@ -434,7 +434,7 @@ function drawSurface(
 
   const labelAt = vertices[0];
   if (labelAt) {
-    ctx.font = "500 11px ui-sans-serif, system-ui, sans-serif";
+    ctx.font = '600 11px "Chakra", "Avenir Next", Avenir, sans-serif';
     ctx.fillStyle = invalid
       ? "rgba(244, 176, 180, 0.95)"
       : dropTarget || selected
@@ -493,6 +493,7 @@ export function renderStage(
   options: {
     width: number;
     height: number;
+    transparent?: boolean;
     edit: boolean;
     selectedId: string | null;
     dropTargetId?: string | null;
@@ -503,8 +504,10 @@ export function renderStage(
   },
 ) {
   ctx.clearRect(0, 0, options.width, options.height);
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, options.width, options.height);
+  if (!options.transparent) {
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, options.width, options.height);
+  }
 
   const surfaces = options.surfaces ?? [];
   const gridStep = options.gridStep ?? GRID_STEPS.medium;

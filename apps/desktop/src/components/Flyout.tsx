@@ -21,6 +21,7 @@ export default function Flyout({
   contentRef,
   placement = "bottom-start",
   offset = 4,
+  matchAnchorWidth = false,
   children,
   className = "",
 }: {
@@ -29,6 +30,7 @@ export default function Flyout({
   contentRef?: RefObject<HTMLDivElement | null>;
   placement?: FlyoutPlacement;
   offset?: number;
+  matchAnchorWidth?: boolean;
   children: ReactNode;
   className?: string;
 }) {
@@ -44,6 +46,7 @@ export default function Flyout({
       const box = anchorRef.current?.getBoundingClientRect();
       if (!box) return;
       const next: CSSProperties = { position: "fixed", zIndex: 80 };
+      if (matchAnchorWidth) next.width = box.width;
       if (placement === "bottom-end") {
         next.top = box.bottom + offset;
         next.right = window.innerWidth - box.right;
@@ -57,17 +60,22 @@ export default function Flyout({
         next.top = box.bottom + offset;
         next.left = box.left;
       }
-      setStyle(next);
+      setStyle((current) => current && current.top === next.top && current.left === next.left && current.right === next.right && current.width === next.width ? current : next);
     };
 
     update();
+    let frame = window.requestAnimationFrame(function followAnchor() {
+      update();
+      frame = window.requestAnimationFrame(followAnchor);
+    });
     window.addEventListener("resize", update);
     window.addEventListener("scroll", update, true);
     return () => {
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
+      window.cancelAnimationFrame(frame);
     };
-  }, [anchorRef, offset, open, placement]);
+  }, [anchorRef, matchAnchorWidth, offset, open, placement]);
 
   if (!open || !style) return null;
 

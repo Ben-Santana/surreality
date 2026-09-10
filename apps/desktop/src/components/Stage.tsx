@@ -1,22 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  add,
   containsMapping,
   containsSurface,
   hitTestHandle,
   hitTestSurfaceHandle,
+  mappingAnchor,
   snapPoint,
+  sub,
 } from "../geometry";
 import { activateMapping, interactiveCustomMappingAt } from "../interact";
 import { useRoomStore } from "../store";
 import { displayMappings, screenToWallPoint, topSurfaceAt, wallToScreenPoint } from "../wall";
 import { GRID_STEPS, type Point } from "../types";
 import MappingCanvas, { canvasPoint } from "./MappingCanvas";
-import CustomMappingOverlays from "./CustomMappingOverlays";
+import MappingLayers from "./MappingLayers";
+import { CustomMappingRuntimeFrames } from "./CustomMappingOverlays";
 import { CustomMappingRuntimeOverlays } from "../customMappings/runtime";
 
 type Drag =
   | { type: "mapping"; id: string; kind: "vertex"; index: number }
-  | { type: "mapping"; id: string; kind: "anchor" }
+  | { type: "mapping"; id: string; kind: "anchor"; offset: Point }
   | { type: "surface"; id: string; kind: "vertex"; index: number }
   | { type: "surface"; id: string; kind: "anchor" };
 
@@ -44,7 +48,6 @@ export default function Stage() {
   const closeMenu = useRoomStore((state) => state.closeMenu);
   const spaceEntered = useRoomStore((state) => state.spaceEntered);
   const [dropSurfaceId, setDropSurfaceId] = useState<string | null>(null);
-  const [hoverSound, setHoverSound] = useState(false);
   const [polygonDraft, setPolygonDraft] = useState<Point[]>([]);
   const [polygonPointer, setPolygonPointer] = useState<Point | null>(null);
 
@@ -75,10 +78,10 @@ export default function Stage() {
   };
 
   return (
-    <div className="absolute inset-0 bg-black">
+    <div className={`editor-stage absolute inset-0 bg-black ${editMode ? "" : "presentation-cursor"}`}>
       <MappingCanvas
         canvasRef={canvasRef}
-        mappings={shown}
+        mappings={[]}
         surfaces={surfaces}
         edit={editMode}
         selectedId={selectedId}
@@ -86,9 +89,7 @@ export default function Stage() {
         grid={Boolean(editMode && (showGrid || !spaceEntered))}
         gridStep={GRID_STEPS[gridSize]}
         handles={false}
-        className={`block h-full w-full touch-none ${
-          editMode ? "cursor-crosshair" : hoverSound ? "cursor-pointer" : "cursor-default"
-        }`}
+        className={`block h-full w-full touch-none ${editMode ? "cursor-crosshair" : "cursor-none"}`}
         onPointerDown={(event) => {
           if (!spaceEntered) return;
           if (event.button === 2) return;
@@ -123,11 +124,13 @@ export default function Stage() {
           const selectedMapping = shown.find((mapping) => mapping.id === selectedId);
           if (selectedMapping) {
             const handle = hitTestHandle(selectedMapping, point);
-            if (handle) {
-              dragRef.current =
-                handle.kind === "anchor"
-                  ? { type: "mapping", id: selectedMapping.id, kind: "anchor" }
-                  : { type: "mapping", id: selectedMapping.id, kind: "vertex", index: handle.index ?? 0 };
+            if (handle?.kind === "vertex") {
+              dragRef.current = {
+                type: "mapping",
+                id: selectedMapping.id,
+                kind: "vertex",
+                index: handle.index ?? 0,
+              };
               event.currentTarget.setPointerCapture(event.pointerId);
               return;
             }
@@ -150,17 +153,26 @@ export default function Stage() {
             const mapping = shown[index];
             if (!mapping) continue;
             const handle = hitTestHandle(mapping, point);
-            if (handle) {
+            if (handle?.kind === "vertex") {
               select(mapping.id);
-              dragRef.current =
-                handle.kind === "anchor"
-                  ? { type: "mapping", id: mapping.id, kind: "anchor" }
-                  : { type: "mapping", id: mapping.id, kind: "vertex", index: handle.index ?? 0 };
+              dragRef.current = {
+                type: "mapping",
+                id: mapping.id,
+                kind: "vertex",
+                index: handle.index ?? 0,
+              };
               event.currentTarget.setPointerCapture(event.pointerId);
               return;
             }
             if (containsMapping(mapping, point)) {
               select(mapping.id);
+              dragRef.current = {
+                type: "mapping",
+                id: mapping.id,
+                kind: "anchor",
+                offset: sub(mappingAnchor(mapping), point),
+              };
+              event.currentTarget.setPointerCapture(event.pointerId);
               return;
             }
           }
@@ -192,21 +204,19 @@ export default function Stage() {
           if (editMode && tool === "polygon" && raw) {
             setPolygonPointer(snappedPoint(raw));
           }
-          if (!editMode) {
-            setHoverSound(Boolean(raw && interactiveCustomMappingAt(shown, raw)));
-          }
           const drag = dragRef.current;
           if (!drag || !raw) return;
-          const point = snappedPoint(raw);
           if (drag.type === "mapping") {
             if (drag.kind === "anchor") {
-              moveAnchor(drag.id, point);
-              setDropSurfaceId(topSurfaceAt(surfaces, point)?.id ?? null);
+              const anchor = snappedPoint(add(raw, drag.offset));
+              moveAnchor(drag.id, anchor);
+              setDropSurfaceId(topSurfaceAt(surfaces, anchor)?.id ?? null);
             } else {
-              moveVertex(drag.id, drag.index, point);
+              moveVertex(drag.id, drag.index, snappedPoint(raw));
             }
             return;
           }
+          const point = snappedPoint(raw);
           if (drag.kind === "anchor") moveSurfaceAnchor(drag.id, point);
           else moveSurfaceVertex(drag.id, drag.index, point);
         }}
@@ -251,6 +261,8 @@ export default function Stage() {
           });
         }}
       />
+      <MappingLayers mappings={shown} edit={editMode} />
+      <CustomMappingRuntimeFrames mappings={shown} />
       {editMode && tool === "polygon" && polygonDraft.length > 0 ? (
         <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
           <polyline
@@ -275,7 +287,6 @@ export default function Stage() {
           ))}
         </svg>
       ) : null}
-      <CustomMappingOverlays mappings={shown} runRuntime />
       <CustomMappingRuntimeOverlays />
       {editMode ? (
         <MappingCanvas

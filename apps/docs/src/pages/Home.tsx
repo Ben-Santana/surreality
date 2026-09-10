@@ -1,8 +1,53 @@
-import { ArrowRight, Box, Code2, ShieldCheck } from "lucide-react";
-import { useEffect } from "react";
+import { ArrowUpRight, Box, Code2, ShieldCheck } from "lucide-react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { DocPath } from "../nav";
 
+type HeroPoint = readonly [number, number];
+
+const initialHeroSurface: HeroPoint[] = [[148, 292], [390, 270], [450, 488], [188, 516]];
+
+function interpolate(a: HeroPoint, b: HeroPoint, amount: number): HeroPoint {
+  return [a[0] + (b[0] - a[0]) * amount, a[1] + (b[1] - a[1]) * amount];
+}
+
+function surfaceGrid(points: HeroPoint[]) {
+  const [topLeft, topRight, bottomRight, bottomLeft] = points;
+  if (!topLeft || !topRight || !bottomRight || !bottomLeft) return "";
+  const lines: string[] = [];
+  for (let index = 1; index < 4; index += 1) {
+    const amount = index / 4;
+    const verticalStart = interpolate(topLeft, topRight, amount);
+    const verticalEnd = interpolate(bottomLeft, bottomRight, amount);
+    const horizontalStart = interpolate(topLeft, bottomLeft, amount);
+    const horizontalEnd = interpolate(topRight, bottomRight, amount);
+    lines.push(`M${verticalStart.join(" ")}L${verticalEnd.join(" ")}`);
+    lines.push(`M${horizontalStart.join(" ")}L${horizontalEnd.join(" ")}`);
+  }
+  return lines.join(" ");
+}
+
 export function Home({ path }: { path: DocPath }) {
+  const [heroSurface, setHeroSurface] = useState<HeroPoint[]>(initialHeroSurface);
+  const [draggedHandle, setDraggedHandle] = useState<number | null>(null);
+  const dragState = useRef<{ index: number; offset: HeroPoint } | null>(null);
+
+  const dragHandle = (event: ReactPointerEvent<SVGGElement>, index: number) => {
+    const activeDrag = dragState.current;
+    if (!activeDrag || activeDrag.index !== index) return;
+    const svg = event.currentTarget.ownerSVGElement;
+    const matrix = svg?.getScreenCTM();
+    if (!svg || !matrix) return;
+    const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+    setHeroSurface((current) => current.map((value, pointIndex) => (
+      pointIndex === index
+        ? [
+            Math.max(8, Math.min(592, point.x - activeDrag.offset[0])),
+            Math.max(8, Math.min(592, point.y - activeDrag.offset[1])),
+          ] as const
+        : value
+    )));
+  };
+
   useEffect(() => {
     if (path === "/quickstart") {
       document.getElementById("quickstart")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -15,15 +60,73 @@ export function Home({ path }: { path: DocPath }) {
     <>
       <section className="hero" id="overview">
         <div className="hero-copy">
-          <p className="kicker"><span>EXTENSION</span> .surreality</p>
-          <h1>Reality has too many rules<br /><i>Break a few</i></h1>
-          <p className="lede">A complete field guide to building portable, code-powered mappings for Surreality.</p>
+          <h1><span className="hero-rule-line">Reality has too many rules</span><i>break a few</i></h1>
           <div className="hero-actions">
-            <a className="primary" href="#/quickstart">Build your first mapping <ArrowRight size={16} /></a>
-            <a className="secondary" href="#/runtime-api">Explore the API</a>
+            <a className="inline-action" href="#/quickstart">Build your first mapping <ArrowUpRight size={16} /></a>
           </div>
         </div>
-        <div className="hero-object" aria-hidden="true"><div className="plane p1" /><div className="plane p2" /><div className="plane p3" /><span>480 × 270</span></div>
+        <svg className="hero-shapes" viewBox="0 0 600 600" fill="none" aria-hidden="true">
+          <g className="hero-surface hero-surface-back">
+            <polygon points="62,150 258,112 268,318 78,346" />
+            <path d="M127 137L142 336M193 124L205 327M68 216L261 181M73 282L265 250" />
+          </g>
+          <g className="hero-surface hero-surface-mid">
+            <polygon points="318,92 538,142 518,358 300,312" />
+            <path d="M391 109L373 327M465 126L446 342M312 165L532 214M306 238L525 286" />
+          </g>
+          <g className="hero-surface hero-surface-selected">
+            <polygon points={heroSurface.map((point) => point.join(",")).join(" ")} />
+            <path d={surfaceGrid(heroSurface)} />
+            {heroSurface.map(([x, y], index) => (
+              <g
+                className="hero-surface-handle"
+                data-dragging={draggedHandle === index || undefined}
+                key={index}
+                role="button"
+                aria-label={`Drag surface corner ${index + 1}`}
+                tabIndex={0}
+                transform={`translate(${x} ${y})`}
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  const svg = event.currentTarget.ownerSVGElement;
+                  const matrix = svg?.getScreenCTM();
+                  if (!matrix) return;
+                  const pointer = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+                  dragState.current = { index, offset: [pointer.x - x, pointer.y - y] };
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                  setDraggedHandle(index);
+                }}
+                onPointerMove={(event) => dragHandle(event, index)}
+                onPointerUp={(event) => {
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                  dragState.current = null;
+                  setDraggedHandle(null);
+                }}
+                onPointerCancel={() => {
+                  dragState.current = null;
+                  setDraggedHandle(null);
+                }}
+                onKeyDown={(event) => {
+                  const movement: Record<string, HeroPoint> = {
+                    ArrowLeft: [-8, 0], ArrowRight: [8, 0], ArrowUp: [0, -8], ArrowDown: [0, 8],
+                  };
+                  const delta = movement[event.key];
+                  if (!delta) return;
+                  event.preventDefault();
+                  setHeroSurface((current) => current.map((value, pointIndex) => (
+                    pointIndex === index
+                      ? [Math.max(8, Math.min(592, value[0] + delta[0])), Math.max(8, Math.min(592, value[1] + delta[1]))] as const
+                      : value
+                  )));
+                }}
+              >
+                <rect className="hero-surface-hit" x="-18" y="-18" width="36" height="36" />
+                <rect x="-7" y="-7" width="14" height="14" />
+                <circle r="2" />
+              </g>
+            ))}
+          </g>
+        </svg>
       </section>
 
       <section className="principles" aria-label="Package principles">
@@ -42,7 +145,7 @@ export function Home({ path }: { path: DocPath }) {
             <li><b>Build</b><p>Use browser APIs. Keep package paths relative and dependencies bundled.</p></li>
             <li><b>Pack</b><p>Create one <code>.surreality</code> package containing code, assets, and optional native integrations.</p></li>
           </ol>
-          <p className="continue"><a href="#/manifest">Continue with the manifest reference <ArrowRight size={14} /></a></p>
+          <p className="continue"><a href="#/manifest">Continue with the manifest reference <ArrowUpRight size={14} /></a></p>
         </div>
       </section>
     </>

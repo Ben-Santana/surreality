@@ -4,6 +4,7 @@ import {
   ChevronsDown,
   ChevronsUp,
   Copy,
+  PackageX,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -17,6 +18,7 @@ import { displayVertices } from "../wall";
 import type { CustomMapping, TextMapping } from "../types";
 import ColorPicker from "./ColorPicker";
 import CustomMappingFrame from "./CustomMappingFrame";
+import InspectorSelect from "./InspectorSelect";
 
 export default function Inspector() {
   useCustomMappings();
@@ -214,10 +216,17 @@ function CustomMappingInspector({ mapping }: { mapping: CustomMapping }) {
   const entry = getCustomMapping(mapping.packageId, mapping.packageVersion);
   if (!entry) {
     return (
-      <div className="border border-amber-400/30 bg-amber-400/5 p-3 text-[12px] text-amber-100">
-        <p className="font-medium">Missing custom mapping</p>
-        <p className="mt-1 break-all text-amber-100/60">{mapping.packageId}@{mapping.packageVersion}</p>
-        <p className="mt-2 text-amber-100/70">Install this package to restore its renderer and settings. Its saved configuration has been preserved.</p>
+      <div className="border border-amber-300/40 bg-amber-300/[0.08] p-3 text-[12px] text-amber-100 shadow-[inset_0_0_24px_rgba(252,211,77,0.04)]">
+        <div className="flex items-start gap-3">
+          <span className="flex size-8 shrink-0 items-center justify-center border border-amber-300/40 bg-amber-300/10 text-amber-200">
+            <PackageX className="size-4" strokeWidth={1.75} aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="font-medium text-amber-50">Mapping unavailable</p>
+            <p className="mt-1 break-all font-mono text-[10px] leading-4 text-amber-100/55">{mapping.packageId}@{mapping.packageVersion}</p>
+          </div>
+        </div>
+        <p className="mt-3 leading-relaxed text-amber-100/65">Install this package to restore its renderer and settings. Its saved configuration has been preserved.</p>
       </div>
     );
   }
@@ -270,13 +279,15 @@ function ClockControls({ mapping }: { mapping: TextMapping }) {
         ))}
       </div>
       {analog ? (
-        <label className="block space-y-1.5">
+        <div className="space-y-1.5">
           <span className="chrome-label">Face</span>
-          <select value={mapping.clockFaceStyle ?? "ticks"} onChange={(event) => patch({ clockFaceStyle: event.target.value as TextMapping["clockFaceStyle"] })}
-            className="panel-field no-drag h-9 w-full px-2 text-[12px] outline-none">
-            <option value="minimal">Minimal</option><option value="ticks">Precision ticks</option><option value="numerals">Numerals</option>
-          </select>
-        </label>
+          <InspectorSelect
+            ariaLabel="Clock face"
+            value={mapping.clockFaceStyle ?? "ticks"}
+            options={[{ id: "minimal", label: "Minimal" }, { id: "ticks", label: "Precision ticks" }, { id: "numerals", label: "Numerals" }]}
+            onChange={(clockFaceStyle) => patch({ clockFaceStyle: clockFaceStyle as TextMapping["clockFaceStyle"] })}
+          />
+        </div>
       ) : (
         <Toggle label="24-hour time" checked={mapping.clock24Hour ?? false} onChange={(clock24Hour) => patch({ clock24Hour })} />
       )}

@@ -11,10 +11,10 @@
     "build:docs": "npm run build --prefix apps/docs",
     "build:all": "npm run build:desktop && npm run build:docs",
     "check": "npm run check --prefix apps/desktop && npm run check --prefix apps/docs",
+    "check:supabase": "npm run check:supabase --prefix apps/desktop",
     "test": "npm run test --prefix apps/desktop",
     "create:mapping": "npm run create:mapping --prefix apps/desktop --",
     "pack:mapping": "npm run pack:mapping --prefix apps/desktop --",
-    "build:mappings": "npm run build:mappings --prefix apps/desktop",
     "preview": "npm run preview --prefix apps/desktop",
     "start": "npm run start --prefix apps/desktop"
   }

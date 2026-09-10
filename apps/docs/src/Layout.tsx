@@ -1,9 +1,10 @@
 import { Menu, Moon, Sun, X } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
+import { SurrealityMark } from "./Brand";
 import { pages, sections, type DocPath, isCurrent } from "./nav";
 
 export function Layout({ path, children }: { path: DocPath; children: ReactNode }) {
-  const [light, setLight] = useState(() => localStorage.getItem("mapping-docs-theme") === "light");
+  const [light, setLight] = useState(() => localStorage.getItem("mapping-docs-theme") !== "dark");
   const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => {
     document.documentElement.dataset.theme = light ? "light" : "dark";
@@ -25,13 +26,13 @@ export function Layout({ path, children }: { path: DocPath; children: ReactNode 
 
   return (
     <div className="site-shell">
+      <a className="skip-link" href="#main-content">Skip to content</a>
       <header className="topbar">
         <a className="wordmark" href="#/" aria-label="Surreality documentation home">
-          <span className="mark"><i /><i /><i /></span>
-          <span>SURREALITY</span><b>/</b><em>DEVELOPER</em>
+          <SurrealityMark />
         </a>
+        <span className="topbar-title">DEV DOCS</span>
         <div className="top-actions">
-          <span className="version">FORMAT 02</span>
           <button className="theme-toggle" onClick={() => setLight((value) => !value)} aria-label={`Use ${light ? "dark" : "light"} mode`}>
             {light ? <Moon size={15} /> : <Sun size={15} />}
           </button>
@@ -61,7 +62,7 @@ export function Layout({ path, children }: { path: DocPath; children: ReactNode 
       </aside>
       {menuOpen && <button className="menu-backdrop" type="button" onClick={() => setMenuOpen(false)} aria-label="Close navigation" />}
 
-      <main>{children}</main>
+      <main id="main-content">{children}<footer className="docs-footer"><span>Surreality / Developer documentation</span><a href="#/">Back to overview ↗</a></footer></main>
     </div>
   );
 }

@@ -7,6 +7,8 @@ import { useRuntimeSnapshots } from "./customMappings/runtime";
 import { useRoomStore } from "./store";
 import { displayMappings } from "./wall";
 import { initializeCustomMappings } from "./customMappings/registry";
+import { disposeCloud, initializeCloud } from "./cloud";
+import AuthDialog from "./components/AuthDialog";
 
 export default function App() {
   const mode = new URLSearchParams(window.location.search).get("mode");
@@ -24,6 +26,18 @@ export default function App() {
 
   useEffect(() => {
     if (output || controls) return;
+    void initializeCloud();
+    const flush = () => { void window.room?.persistence.flush(); };
+    window.addEventListener("beforeunload", flush);
+    return () => {
+      window.removeEventListener("beforeunload", flush);
+      flush();
+      disposeCloud();
+    };
+  }, [controls, output]);
+
+  useEffect(() => {
+    if (output || controls) return;
     window.room?.sync({
       mappings: shown,
       runtime,
@@ -32,5 +46,5 @@ export default function App() {
 
   if (output) return <OutputView />;
   if (controls) return <ControlsWindow />;
-  return <Editor />;
+  return <><Editor /><AuthDialog /></>;
 }

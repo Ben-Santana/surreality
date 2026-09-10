@@ -58,7 +58,7 @@ export type PolygonMapping = MappingBase & { type: "polygon" };
 
 export type CircleMapping = MappingBase & { type: "circle" };
 
-export type TextFontId = "chakra" | "mono" | "grotesk" | "editorial";
+export type TextFontId = "chakra" | "technical" | "expression";
 
 export type TextContentMode = "text" | "clock";
 export type ClockStyle = "digital" | "analog";
@@ -115,6 +115,7 @@ export type CustomMappingGeometry = "quad" | "polygon" | "circle";
 
 export type CustomMappingPermission =
   | "audio:play"
+  | "camera:read"
   | "events:room"
   | "input:keyboard"
   | "input:pointer"
@@ -154,6 +155,7 @@ export type CustomMappingPackageManifest = {
 export type CustomMappingPackageRecord = {
   manifest: CustomMappingPackageManifest;
   source: "bundled" | "installed";
+  installationSource?: "local" | "community";
   enabled: boolean;
 };
 
@@ -162,6 +164,56 @@ export type CustomMappingImportResult =
   | { canceled: false; installed: CustomMappingPackageRecord };
 
 export type CustomMappingUninstallResult = { removed: boolean };
+
+export type LocalAsset = {
+  id: string;
+  sha256: string;
+  source: string;
+  fileName: string;
+  mimeType: string;
+  byteSize: number;
+};
+
+export type AssetImportResult =
+  | { canceled: true }
+  | { canceled: false; asset: LocalAsset };
+
+export type CloudState = {
+  configured: boolean;
+  user: { id: string; email: string | null } | null;
+  profile: { username: string | null; isAdmin: boolean } | null;
+  lastError: string | null;
+};
+
+export type CommunityReleaseStatus = "published" | "pending_review" | "rejected" | "taken_down";
+export type CommunityRelease = {
+  releaseId: string;
+  packageId: string;
+  version: string;
+  manifest: CustomMappingPackageManifest;
+  sha256: string;
+  byteSize: number;
+  publisherUsername: string;
+  status: CommunityReleaseStatus;
+  statusReason: string | null;
+  approvedNative: boolean;
+  publishedAt: string | null;
+  createdAt: string;
+  installed: boolean;
+  owned?: boolean;
+  thumbnailUrl?: string;
+  listingName?: string;
+  listingDescription?: string;
+  saved?: boolean;
+  installationSource?: "local" | "community";
+  firstDownloadedAt?: string;
+  lastDownloadedAt?: string;
+  downloadCount?: number;
+};
+
+export type CommunityBrowseOptions = { search?: string; sort?: "newest" | "name"; cursor?: string };
+export type CommunityBrowseResult = { items: CommunityRelease[]; nextCursor: string | null };
+export type CommunityProgress = { operation: "upload" | "download"; releaseId?: string; percent: number; message: string };
 
 export type ContextMenuState = {
   x: number;
@@ -198,6 +250,44 @@ export type RoomAPI = {
   importCustomMapping: () => Promise<CustomMappingImportResult>;
   uninstallCustomMapping: (packageId: string, packageVersion: string) => Promise<CustomMappingUninstallResult>;
   onCustomMappingsChanged: (callback: () => void) => () => void;
+  persistence: {
+    getItem: (name: string) => Promise<string | null>;
+    setItem: (name: string, value: string) => void;
+    flush: () => Promise<void>;
+  };
+  importAsset: (kind: "media" | "audio") => Promise<AssetImportResult>;
+  cloud: {
+    configure: (url: string, publishableKey: string) => Promise<CloudState>;
+    getState: () => Promise<CloudState>;
+    signUp: (email: string, password: string) => Promise<{ needsEmailConfirmation: boolean; state: CloudState }>;
+    signIn: (email: string, password: string) => Promise<CloudState>;
+    signOut: () => Promise<CloudState>;
+    sendPasswordReset: (email: string) => Promise<void>;
+    recoverPassword: (email: string, token: string, newPassword: string) => Promise<CloudState>;
+    onState: (callback: (state: CloudState) => void) => () => void;
+  };
+  community: {
+    browse: (options: CommunityBrowseOptions) => Promise<CommunityBrowseResult>;
+    getPackage: (packageId: string) => Promise<CommunityRelease[]>;
+    listDownloads: () => Promise<CommunityRelease[]>;
+    listSaved: () => Promise<CommunityRelease[]>;
+    listUploads: () => Promise<CommunityRelease[]>;
+    listModerationQueue: () => Promise<CommunityRelease[]>;
+    setUsername: (username: string) => Promise<CloudState>;
+    uploadFromFile: () => Promise<{ canceled: boolean; release?: CommunityRelease }>;
+    chooseThumbnail: () => Promise<{ canceled: boolean; previewUrl?: string; thumbnail?: { mimeType: string; data: string } }>;
+    updateListing: (releaseId: string, listing: { name: string; description: string; removeThumbnail?: boolean; thumbnail?: { mimeType: string; data: string } }) => Promise<{ thumbnailRemoved?: boolean; thumbnailUrl?: string }>;
+    downloadAndInstall: (releaseId: string) => Promise<{ canceled: boolean; installed?: CustomMappingPackageRecord }>;
+    report: (releaseId: string, reason: string) => Promise<void>;
+    setSaved: (releaseId: string, saved: boolean) => Promise<void>;
+    takeDown: (releaseId: string, reason?: string) => Promise<void>;
+    restore: (releaseId: string) => Promise<void>;
+    approve: (releaseId: string) => Promise<void>;
+    reject: (releaseId: string, reason: string) => Promise<void>;
+    onProgress: (callback: (progress: CommunityProgress) => void) => () => void;
+    open: () => void;
+    onOpen: (callback: () => void) => () => void;
+  };
   onPluginData: (callback: (payload: PluginDataMessage) => void) => () => void;
   sync: (payload: unknown) => void;
   onSync: (callback: (payload: unknown) => void) => () => void;

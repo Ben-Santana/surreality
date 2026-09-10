@@ -28,36 +28,65 @@ const bundledDefinitionsById = new Map(
   bundledDefinitions.map((definition) => [`${BUNDLED_PACKAGE_PREFIX}${definition.kind}`, definition]),
 );
 const EMPTY_PACKAGES: CustomMappingPackage[] = [];
+const coreMediaPackage: CustomMappingPackage = {
+  source: "bundled",
+  enabled: true,
+  definition: mediaSpecial,
+  manifest: {
+    manifestVersion: 2,
+    id: CORE_MEDIA_PACKAGE_ID,
+    name: mediaSpecial.label,
+    version: "1.0.0",
+    configVersion: mediaSpecial.version ?? 1,
+    description: mediaSpecial.description,
+    author: { name: "Surreality" },
+    geometry: mediaSpecial.geometry ?? "quad",
+    contentSize: mediaSpecial.contentSize,
+    defaultColor: mediaSpecial.defaultColor,
+    defaultConfig: { ...mediaSpecial.defaultConfig },
+    entrypoints: { mapping: "__builtin__" },
+    permissions: [],
+    bundled: true,
+  },
+};
 
 let installedPackages: CustomMappingPackageRecord[] = [];
-let initialized = false;
+let initialization: Promise<void> | undefined;
 let unsubscribeChanges: (() => void) | undefined;
-let snapshot: CustomMappingPackage[] = EMPTY_PACKAGES;
+let snapshot: CustomMappingPackage[] = [coreMediaPackage];
 const listeners = new Set<() => void>();
 
 function rebuildSnapshot() {
-  snapshot = installedPackages.map((item) => ({
-    ...item,
-    definition: bundledDefinitionsById.get(item.manifest.id),
-  }));
+  snapshot = [
+    coreMediaPackage,
+    ...installedPackages
+      .filter((item) => item.manifest.id !== CORE_MEDIA_PACKAGE_ID)
+      .map((item) => ({
+        ...item,
+        definition: bundledDefinitionsById.get(item.manifest.id),
+      })),
+  ];
   for (const listener of listeners) listener();
 }
 
 export async function initializeCustomMappings() {
-  if (initialized) return;
-  initialized = true;
-  try {
-    installedPackages = (await window.room?.listCustomMappings()) ?? [];
-    rebuildSnapshot();
-    unsubscribeChanges ??= window.room?.onCustomMappingsChanged(() => {
-      void window.room?.listCustomMappings().then((packages) => {
-        installedPackages = packages;
-        rebuildSnapshot();
+  if (!window.room) return;
+  if (!initialization) {
+    initialization = (async () => {
+      installedPackages = await window.room!.listCustomMappings();
+      rebuildSnapshot();
+      unsubscribeChanges ??= window.room!.onCustomMappingsChanged(() => {
+        void window.room?.listCustomMappings().then((packages) => {
+          installedPackages = packages;
+          rebuildSnapshot();
+        });
       });
+    })().catch((error) => {
+      initialization = undefined;
+      console.error("Could not list installed custom mappings", error);
     });
-  } catch (error) {
-    console.error("Could not list installed custom mappings", error);
   }
+  await initialization;
 }
 
 export async function importCustomMappingPackage() {
@@ -127,9 +156,14 @@ export function legacyKindForPackage(packageId: string): string | null {
 
 export function subscribeCustomMappings(listener: () => void) {
   listeners.add(listener);
+  void initializeCustomMappings();
   return () => listeners.delete(listener);
 }
 
 export function useCustomMappings(): CustomMappingPackage[] {
   return useSyncExternalStore(subscribeCustomMappings, () => snapshot, () => EMPTY_PACKAGES);
 }
+
+// Vite can replace this module without remounting App during development.
+// Rehydrate package state whenever the registry module itself is evaluated.
+if (typeof window !== "undefined") void initializeCustomMappings();

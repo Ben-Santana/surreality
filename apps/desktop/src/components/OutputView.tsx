@@ -3,12 +3,11 @@ import { activateMapping, interactiveCustomMappingAt } from "../interact";
 import { applyRuntimeSnapshots, CustomMappingRuntimeOverlays } from "../customMappings/runtime";
 import type { Mapping, SyncPayload } from "../types";
 import MappingCanvas, { canvasPoint } from "./MappingCanvas";
-import CustomMappingOverlays from "./CustomMappingOverlays";
+import MappingLayers from "./MappingLayers";
 
 export default function OutputView() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [mappings, setMappings] = useState<Mapping[]>([]);
-  const [hoverSound, setHoverSound] = useState(false);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -34,23 +33,19 @@ export default function OutputView() {
   };
 
   return (
-    <div className="relative h-screen w-screen bg-black">
+    <div className="presentation-cursor relative h-screen w-screen bg-black">
       <MappingCanvas
         canvasRef={canvasRef}
-        mappings={mappings}
-        className={`block h-full w-full ${hoverSound ? "cursor-pointer" : "cursor-default"}`}
+        mappings={[]}
+        className="block h-full w-full cursor-none"
         onPointerDown={(event) => {
           const point = pointFromEvent(event);
           if (!point) return;
           const pad = interactiveCustomMappingAt(mappings, point);
           if (pad) activateMapping(pad);
         }}
-        onPointerMove={(event) => {
-          const point = pointFromEvent(event);
-          setHoverSound(Boolean(point && interactiveCustomMappingAt(mappings, point)));
-        }}
       />
-      <CustomMappingOverlays mappings={mappings} />
+      <MappingLayers mappings={mappings} />
       <CustomMappingRuntimeOverlays />
     </div>
   );

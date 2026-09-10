@@ -9,12 +9,12 @@ import {
   Palette,
   Pentagon,
   Plus,
+  Shapes,
   Trash2,
-  Sparkles,
   Type,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { CORE_MEDIA_PACKAGE_ID, useCustomMappings } from "../customMappings/registry";
+import { CORE_MEDIA_PACKAGE_ID } from "../customMappings/registry";
 import { useRoomStore } from "../store";
 import ColorPicker from "./ColorPicker";
 import { isPolygonGeometry } from "../geometry";
@@ -48,8 +48,6 @@ export default function ContextMenu() {
   const addText = useRoomStore((state) => state.addText);
   const addSurface = useRoomStore((state) => state.addSurface);
   const addCustomMapping = useRoomStore((state) => state.addCustomMapping);
-  const installedMappings = useCustomMappings();
-  const customMappings = installedMappings.filter(({ manifest }) => manifest.id !== CORE_MEDIA_PACKAGE_ID);
   const deleteMapping = useRoomStore((state) => state.deleteMapping);
   const deleteSurface = useRoomStore((state) => state.deleteSurface);
   const addVertexNear = useRoomStore((state) => state.addVertexNear);
@@ -104,13 +102,9 @@ export default function ContextMenu() {
           action: () => addCustomMapping(CORE_MEDIA_PACKAGE_ID, at),
         },
         {
-          label: "Add custom mapping",
-          icon: <Sparkles className="size-4" />,
-          children: customMappings.map((item) => ({
-            label: item.manifest.name,
-            icon: <Sparkles className="size-4" />,
-            action: () => addCustomMapping(item.manifest.id, at),
-          })),
+          label: "Browse custom mappings",
+          icon: <Shapes className="size-4" />,
+          action: () => window.dispatchEvent(new Event("surreality-open-custom-mappings")),
         },
       ];
     }
@@ -178,7 +172,6 @@ export default function ContextMenu() {
     setTool,
     setColorMode,
     surface,
-    customMappings,
   ]);
 
   useEffect(() => {

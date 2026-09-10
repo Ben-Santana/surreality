@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { nextSpaceName, useRoomStore } from "../store";
+import { UiButton, UiLabel, UiPanel } from "./ui/Chrome";
 
 export default function SpaceNameDialog() {
   const prompt = useRoomStore((state) => state.spaceNamePrompt);
@@ -25,8 +26,8 @@ export default function SpaceNameDialog() {
 
   return (
     <div className="pointer-events-auto absolute inset-0 z-50 flex items-center justify-center bg-black/55">
-      <div className="editor-panel analog-frame w-[min(360px,calc(100vw-48px))] border border-white/10 bg-[#111114] p-5 text-white shadow-2xl shadow-black/50">
-        <p className="chrome-label">{prompt === "save-as" ? "Save as" : "Name space"}</p>
+      <UiPanel role="dialog" aria-modal="true" className="editor-panel w-[min(360px,calc(100vw-48px))] p-5 shadow-2xl shadow-black/50">
+        <UiLabel>{prompt === "save-as" ? "Save as" : "Name space"}</UiLabel>
         <p className="mt-2 text-[13px] leading-relaxed text-white/50">
           {prompt === "save-as" ? "Save a copy of this room as a new space." : "Give this space a name to save it."}
         </p>
@@ -50,23 +51,24 @@ export default function SpaceNameDialog() {
           className="panel-field no-drag mt-4 h-9 w-full rounded-none px-3 text-[13px] outline-none"
         />
         <div className="mt-4 grid grid-cols-2 gap-2">
-          <button
+          <UiButton
             type="button"
-            className="flex h-9 items-center justify-center border border-white/15 text-[13px] text-white/70 hover:bg-white/10 hover:text-white"
+            className="h-9"
             onClick={closeSpaceNamePrompt}
           >
             Cancel
-          </button>
-          <button
+          </UiButton>
+          <UiButton
+            tone="primary"
             type="button"
             disabled={!name.trim()}
-            className="flex h-9 items-center justify-center border border-accent/40 bg-accent/15 text-[13px] text-white hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
+            className="h-9"
             onClick={submit}
           >
             Save
-          </button>
+          </UiButton>
         </div>
-      </div>
+      </UiPanel>
     </div>
   );
 }

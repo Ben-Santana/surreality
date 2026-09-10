@@ -1,10 +1,19 @@
 import { ExternalLink } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import CustomMappingBrowser from "./CustomMappingBrowser";
 import Inspector from "./Inspector";
 import LayerPanel from "./LayerPanel";
 import StatusBar from "./StatusBar";
 import Toolbar from "./Toolbar";
 
 export default function RoomPanel({ detached = false }: { detached?: boolean }) {
+  const [view, setView] = useState<"editor" | "custom-mappings">("editor");
+  const showEditor = useCallback(() => setView("editor"), []);
+  useEffect(() => {
+    const open = () => setView("custom-mappings");
+    window.addEventListener("surreality-open-custom-mappings", open);
+    return () => window.removeEventListener("surreality-open-custom-mappings", open);
+  }, []);
   const detach = () => {
     if (detached) return;
     const panel = document.querySelector<HTMLElement>(".embedded-room-panel");
@@ -23,17 +32,18 @@ export default function RoomPanel({ detached = false }: { detached?: boolean }) 
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="relative z-30 shrink-0 overflow-visible border-b border-white/10 px-1 py-1">
-        <Toolbar />
+    <div className="room-panel flex min-h-0 flex-1 flex-col">
+      {view === "custom-mappings" ? <CustomMappingBrowser onBack={showEditor} /> : <>
+      <div className="room-toolbar relative z-30 shrink-0 overflow-visible border-b border-white/10 px-2 py-1.5">
+        <Toolbar onOpenCustomMappings={() => setView("custom-mappings")} />
       </div>
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        <section className="flex w-52 shrink-0 flex-col border-r border-white/10">
-          <p className="chrome-label px-3 py-2">Mappings</p>
+      <div className="room-content flex min-h-0 flex-1 overflow-hidden">
+        <section className="room-layers flex w-48 shrink-0 flex-col border-r border-white/10">
+          <p className="chrome-label px-3 pb-2 pt-3">Mappings</p>
           <div className="min-h-0 flex-1 overflow-auto"><LayerPanel /></div>
         </section>
-        <section className="flex min-w-0 flex-1 flex-col">
-          <div className="flex h-8 shrink-0 items-center px-4">
+        <section className="room-inspector flex min-w-0 flex-1 flex-col">
+          <div className="flex h-10 shrink-0 items-center px-4">
             <p className="chrome-label">Inspector</p>
             {!detached ? <button
               type="button"
@@ -48,7 +58,7 @@ export default function RoomPanel({ detached = false }: { detached?: boolean }) 
           <div className="min-h-0 flex-1 overflow-auto"><Inspector /></div>
         </section>
       </div>
-      <div className="shrink-0 border-t border-white/10 px-3"><StatusBar /></div>
+      <div className="room-status shrink-0 border-t border-white/10 px-3"><StatusBar /></div></>}
     </div>
   );
 }

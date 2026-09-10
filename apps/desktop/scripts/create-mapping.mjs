@@ -35,14 +35,14 @@ if (!slug) {
   root.style.placeItems = "center";
   root.style.background = \`rgba(\${color.r}, \${color.g}, \${color.b}, \${color.a / 255})\`;
   root.style.color = "white";
-  root.style.font = "600 28px system-ui, sans-serif";
+  root.style.font = '500 28px "Avenir Next", Avenir, sans-serif';
   root.textContent = config.label ?? "${title}";
 }
 `);
     fs.writeFileSync(path.join(directory, "inspector.js"), `export default function mount({ root, config, updateConfig }) {
   root.style.padding = "12px";
   root.style.color = "white";
-  root.style.font = "13px system-ui, sans-serif";
+  root.style.font = '13px "Avenir Next", Avenir, sans-serif';
   const label = document.createElement("label");
   label.textContent = "Label";
   const input = document.createElement("input");

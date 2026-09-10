@@ -12,14 +12,12 @@ import {
   Presentation,
   Redo2,
   Save,
-  Sparkles,
-  PackagePlus,
-  Trash2,
+  Shapes,
   Type,
   Undo2,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { CORE_MEDIA_PACKAGE_ID, importCustomMappingPackage, uninstallCustomMappingPackage, useCustomMappings } from "../customMappings/registry";
+import { CORE_MEDIA_PACKAGE_ID } from "../customMappings/registry";
 import { useRoomStore } from "../store";
 import type { DisplayInfo, GridSize, Tool } from "../types";
 import Flyout, { eventInside } from "./Flyout";
@@ -39,7 +37,7 @@ const gridSizes: { id: GridSize; label: string }[] = [
 
 type MenuId = "add" | "grid" | "projector";
 
-export default function Toolbar() {
+export default function Toolbar({ onOpenCustomMappings, compact = false }: { onOpenCustomMappings: () => void; compact?: boolean }) {
   const tool = useRoomStore((state) => state.tool);
   const setTool = useRoomStore((state) => state.setTool);
   const customMappingPackageId = useRoomStore((state) => state.customMappingPackageId);
@@ -62,93 +60,20 @@ export default function Toolbar() {
   const spaceDirty = useRoomStore((state) => state.isSpaceDirty());
   const [displays, setDisplays] = useState<DisplayInfo[]>([]);
   const [menu, setMenu] = useState<MenuId | null>(null);
-  const [customOpen, setCustomOpen] = useState(false);
-  const [customSide, setCustomSide] = useState<"left" | "right">("right");
-  const [importing, setImporting] = useState(false);
-  const [uninstalling, setUninstalling] = useState<string | null>(null);
-  const [notice, setNotice] = useState<{ tone: "success" | "error"; message: string } | null>(null);
-  const installedMappings = useCustomMappings();
-  const customMappings = installedMappings.filter(({ manifest }) => manifest.id !== CORE_MEDIA_PACKAGE_ID);
   const addRef = useRef<HTMLDivElement>(null);
   const addMenuRef = useRef<HTMLDivElement>(null);
-  const customRowRef = useRef<HTMLDivElement>(null);
-  const customMenuRef = useRef<HTMLDivElement>(null);
   const gridSizeRef = useRef<HTMLDivElement>(null);
   const gridMenuRef = useRef<HTMLDivElement>(null);
   const projectorRef = useRef<HTMLDivElement>(null);
   const projectorMenuRef = useRef<HTMLDivElement>(null);
-  const customCloseTimer = useRef<number>(0);
   const createActive = tool !== "select" && editMode;
 
   const toggleMenu = (id: MenuId) => {
-    setCustomOpen(false);
     setMenu((current) => (current === id ? null : id));
   };
 
   const closeMenus = () => {
     setMenu(null);
-    setCustomOpen(false);
-  };
-
-  const openCustom = () => {
-    window.clearTimeout(customCloseTimer.current);
-    const row = customRowRef.current?.getBoundingClientRect();
-    if (row) {
-      setCustomSide(row.right + 232 < window.innerWidth ? "right" : "left");
-    }
-    setCustomOpen(true);
-  };
-
-  const closeCustomSoon = () => {
-    window.clearTimeout(customCloseTimer.current);
-    customCloseTimer.current = window.setTimeout(() => setCustomOpen(false), 250);
-  };
-
-  const showNotice = (tone: "success" | "error", message: string) => {
-    setNotice({ tone, message });
-    window.setTimeout(() => setNotice(null), 4500);
-  };
-
-  const importPackage = async () => {
-    if (importing) return;
-    setImporting(true);
-    closeMenus();
-    try {
-      const result = await importCustomMappingPackage();
-      if (result && !result.canceled) {
-        showNotice("success", `${result.installed.manifest.name} ${result.installed.manifest.version} installed.`);
-      }
-    } catch (error) {
-      showNotice(
-        "error",
-        error instanceof Error ? error.message : "The custom mapping could not be installed.",
-      );
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  const uninstallPackage = async (packageId: string, packageVersion: string, name: string) => {
-    const key = `${packageId}@${packageVersion}`;
-    if (uninstalling) return;
-    setUninstalling(key);
-    try {
-      const result = await uninstallCustomMappingPackage(packageId, packageVersion);
-      if (result.removed) {
-        if (customMappingPackageId === packageId) {
-          const next = customMappings.find(
-            ({ manifest }) => manifest.id !== packageId || manifest.version !== packageVersion,
-          );
-          if (next) setCustomMappingPackage(next.manifest.id);
-          else setTool("select");
-        }
-        showNotice("success", `${name} ${packageVersion} uninstalled.`);
-      }
-    } catch (error) {
-      showNotice("error", error instanceof Error ? error.message : "The custom mapping could not be uninstalled.");
-    } finally {
-      setUninstalling(null);
-    }
   };
 
   useEffect(() => {
@@ -163,13 +88,10 @@ export default function Toolbar() {
           event,
           addRef.current,
           addMenuRef.current,
-          customRowRef.current,
-          customMenuRef.current,
         ) &&
         menu === "add"
       ) {
         setMenu(null);
-        setCustomOpen(false);
       }
       if (!eventInside(event, gridSizeRef.current, gridMenuRef.current) && menu === "grid") {
         setMenu(null);
@@ -181,24 +103,11 @@ export default function Toolbar() {
     window.addEventListener("pointerdown", onPointerDown);
     return () => {
       window.removeEventListener("pointerdown", onPointerDown);
-      window.clearTimeout(customCloseTimer.current);
     };
   }, [menu]);
 
   return (
-    <div className="flex flex-wrap items-center gap-1">
-      {notice ? (
-        <div
-          role="status"
-          className={`fixed right-5 top-5 z-[120] max-w-sm border px-4 py-3 text-[12px] shadow-2xl backdrop-blur ${
-            notice.tone === "success"
-              ? "border-emerald-400/35 bg-emerald-950/95 text-emerald-100"
-              : "border-red-400/35 bg-red-950/95 text-red-100"
-          }`}
-        >
-          {notice.message}
-        </div>
-      ) : null}
+    <div className={compact ? "compact-toolbar flex items-center gap-1" : "flex flex-wrap items-center gap-1"}>
       <button
         type="button"
         title="Select (V)"
@@ -267,103 +176,28 @@ export default function Toolbar() {
               <Film className="size-4 opacity-80" />
               <span className="flex-1">Media</span>
             </button>
-            <div
-              ref={customRowRef}
-              onMouseEnter={openCustom}
-              onMouseLeave={closeCustomSoon}
+            <button
+              type="button"
+              title="Browse custom mappings (M)"
+              className={`flex h-8 w-full items-center gap-2 rounded-none px-2 text-left text-[13px] hover:bg-white/10 ${
+                tool === "custom" && customMappingPackageId !== CORE_MEDIA_PACKAGE_ID && editMode
+                  ? "bg-accent/15 text-accent"
+                  : "text-white"
+              }`}
+              onClick={() => {
+                closeMenus();
+                onOpenCustomMappings();
+              }}
             >
-              <button
-                type="button"
-                title="Custom mappings (M)"
-                className={`flex h-8 w-full items-center gap-2 rounded-none px-2 text-left text-[13px] hover:bg-white/10 ${
-                  tool === "custom" && editMode ? "bg-accent/15 text-accent" : "text-white"
-                }`}
-                onClick={openCustom}
-              >
-                <Sparkles className="size-4 shrink-0 opacity-80" />
-                <span className="min-w-0 flex-1 whitespace-nowrap">Custom Mappings</span>
-                <span className="font-mono text-[10px] text-white/35">M</span>
-                <span className="text-white/35">›</span>
-              </button>
-            </div>
-            <Flyout
-              open={customOpen}
-              anchorRef={customRowRef}
-              contentRef={customMenuRef}
-              placement={customSide === "right" ? "right-start" : "left-start"}
-              offset={0}
-              className="w-72"
-            >
-              <div
-                className="overflow-hidden rounded-none border border-white/10 bg-[#111114] shadow-2xl"
-                onMouseEnter={openCustom}
-                onMouseLeave={closeCustomSoon}
-              >
-                <div className="border-b border-white/10 px-3 py-2.5">
-                  <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-accent">Custom Mappings</p>
-                  <p className="mt-1 text-[11px] text-white/40">Installed code-powered mappings</p>
-                </div>
-                <div className="max-h-72 overflow-y-auto p-1">
-                  {customMappings.length === 0 ? (
-                    <p className="px-2.5 py-4 text-center text-[11px] text-white/35">No mappings installed</p>
-                  ) : customMappings.map((item) => {
-                    const packageKey = `${item.manifest.id}@${item.manifest.version}`;
-                    return (
-                    <div
-                      key={`${item.manifest.id}@${item.manifest.version}`}
-                      className={`group flex w-full items-stretch rounded-none hover:bg-white/10 ${
-                        tool === "custom" && customMappingPackageId === item.manifest.id
-                          ? "bg-accent/15 text-accent"
-                          : ""
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        className="flex min-w-0 flex-1 items-start gap-2 px-2.5 py-2 text-left"
-                        onClick={() => {
-                          setCustomMappingPackage(item.manifest.id);
-                          closeMenus();
-                        }}
-                      >
-                        <Sparkles className="mt-0.5 size-3.5 shrink-0 text-white/45" />
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-baseline justify-between gap-3">
-                            <span className="truncate text-[13px] text-white">{item.manifest.name}</span>
-                            <span className="shrink-0 font-mono text-[9px] text-white/30">v{item.manifest.version}</span>
-                          </span>
-                          <span className="mt-0.5 block truncate text-[10px] text-white/40">{item.manifest.description}</span>
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        title={`Uninstall ${item.manifest.name}`}
-                        aria-label={`Uninstall ${item.manifest.name}`}
-                        disabled={uninstalling === packageKey}
-                        className="flex w-9 shrink-0 items-center justify-center text-white/25 opacity-0 hover:bg-red-500/15 hover:text-red-300 group-hover:opacity-100 focus:opacity-100 disabled:cursor-wait disabled:opacity-40"
-                        onClick={() => void uninstallPackage(item.manifest.id, item.manifest.version, item.manifest.name)}
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </div>
-                  );})}
-                </div>
-                <div className="border-t border-white/10 p-1">
-                <button
-                  type="button"
-                  disabled={importing}
-                  className="flex h-10 w-full items-center gap-2 px-2.5 text-left text-[12px] text-white/70 hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-50"
-                  onClick={() => void importPackage()}
-                >
-                  <PackagePlus className="size-4 shrink-0" />
-                  {importing ? "Opening package…" : "Import .surreality…"}
-                </button>
-                </div>
-              </div>
-            </Flyout>
+              <Shapes className="size-4 shrink-0 opacity-80" />
+              <span className="min-w-0 flex-1 whitespace-nowrap">Custom Mappings</span>
+              <span className="font-mono text-[10px] text-white/35">M</span>
+            </button>
           </div>
         </Flyout>
       </div>
 
+      {!compact && <>
       <div className="mx-2 h-5 w-px bg-white/15" />
 
       <button
@@ -537,6 +371,7 @@ export default function Toolbar() {
           </div>
         </Flyout>
       </div>
+      </>}
     </div>
   );
 }

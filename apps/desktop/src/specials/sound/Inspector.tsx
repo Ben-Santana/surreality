@@ -1,10 +1,9 @@
 import { Circle, Pentagon, Play, Upload, X } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { SpecialInspectorProps } from "../types";
 import {
   SOUND_PRESET_LABELS,
   SOUND_PRESETS,
-  MAX_SOUND_BYTES,
   circleToPolygonVertices,
   defaultSoundConfig,
   polygonToCircleVertices,
@@ -15,7 +14,6 @@ import { activateSound } from "./player";
 
 export function SoundInspector({ mapping, config, onChange }: SpecialInspectorProps<SoundConfig>) {
   const current = { ...defaultSoundConfig, ...config };
-  const fileRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
 
   const setGeometry = (geometry: SoundGeometry) => {
@@ -27,23 +25,19 @@ export function SoundInspector({ mapping, config, onChange }: SpecialInspectorPr
     onChange({ ...current, geometry }, { vertices });
   };
 
-  const onPickFile = async (file: File | undefined) => {
-    if (!file) return;
+  const onPickFile = async () => {
     setError(null);
-    if (file.size > MAX_SOUND_BYTES) {
-      setError("Keep WAV files under 1.5 MB.");
-      return;
-    }
     try {
-      const customAudio = await readDataUrl(file);
+      const result = await window.room?.importAsset("audio");
+      if (!result || result.canceled) return;
       onChange({
         ...current,
         source: "custom",
-        customAudio,
-        customName: file.name,
+        customAudio: result.asset.source,
+        customName: result.asset.fileName,
       });
-    } catch {
-      setError("Could not read that file.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not import that file.");
     }
   };
 
@@ -94,17 +88,6 @@ export function SoundInspector({ mapping, config, onChange }: SpecialInspectorPr
 
       <div>
         <p className="chrome-label mb-2">Your sound</p>
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".wav,audio/wav,audio/wave,audio/x-wav,audio/*"
-          className="hidden"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            event.target.value = "";
-            void onPickFile(file);
-          }}
-        />
         <div className="flex gap-1.5">
           <button
             type="button"
@@ -118,7 +101,7 @@ export function SoundInspector({ mapping, config, onChange }: SpecialInspectorPr
                 onChange({ ...current, source: "custom" });
                 return;
               }
-              fileRef.current?.click();
+              void onPickFile();
             }}
           >
             <Upload className="size-3.5 shrink-0" />
@@ -200,16 +183,4 @@ function ShapeButton({
       {children}
     </button>
   );
-}
-
-function readDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") resolve(reader.result);
-      else reject(new Error("Could not read file"));
-    };
-    reader.onerror = () => reject(reader.error ?? new Error("Could not read file"));
-    reader.readAsDataURL(file);
-  });
 }

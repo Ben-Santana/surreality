@@ -18,6 +18,7 @@ const PACKAGE_ID = /^[a-z0-9]+(?:[._-][a-z0-9]+)+$/;
 const VERSION = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
 const PERMISSIONS = new Set<CustomMappingPermission>([
   "audio:play",
+  "camera:read",
   "events:room",
   "input:keyboard",
   "input:pointer",
@@ -106,7 +107,7 @@ export function validateManifest(value: unknown): CustomMappingPackageManifest {
     configVersion: value.configVersion,
     description: value.description,
     ...(author ? { author } : {}),
-    ...(typeof value.minimumAppVersion === "string" ? { minimumAppVersion: value.minimumAppVersion } : {}),
+    ...(typeof value.minimumAppVersion === "string" && VERSION.test(value.minimumAppVersion) ? { minimumAppVersion: value.minimumAppVersion } : {}),
     geometry: value.geometry,
     contentSize: positiveSize(value.contentSize, "contentSize"),
     defaultColor: { r: color.r as number, g: color.g as number, b: color.b as number, a: color.a as number },
@@ -132,21 +133,7 @@ export function uninstallCustomMapping(app: App, id: string, version: string): b
   return true;
 }
 
-export function seedBundledCustomMappings(app: App, archiveDirectory: string) {
-  const root = packagesRoot(app);
-  const marker = path.join(root, ".bundled-mappings-seeded-v1");
-  if (!fs.existsSync(archiveDirectory)) return;
-  fs.mkdirSync(root, { recursive: true });
-  const coreMediaArchive = ["surreality", "mapping"].map((extension) => path.join(archiveDirectory, `${CORE_MEDIA_PACKAGE_ID}-1.0.0.${extension}`)).find(fs.existsSync);
-  if (coreMediaArchive) installCustomMappingArchive(app, coreMediaArchive);
-  if (fs.existsSync(marker)) return;
-  for (const name of fs.readdirSync(archiveDirectory).filter((item) => item.endsWith(".surreality") || item.endsWith(".mapping")).sort()) {
-    installCustomMappingArchive(app, path.join(archiveDirectory, name));
-  }
-  fs.writeFileSync(marker, "1\n", { flag: "wx" });
-}
-
-export function listInstalledCustomMappings(app: App): CustomMappingPackageRecord[] {
+export function listInstalledCustomMappings(app: App, installationSource?: (id: string, version: string) => "local" | "community" | undefined): CustomMappingPackageRecord[] {
   const root = packagesRoot(app);
   if (!fs.existsSync(root)) return [];
   const result: CustomMappingPackageRecord[] = [];
@@ -156,7 +143,8 @@ export function listInstalledCustomMappings(app: App): CustomMappingPackageRecor
     for (const version of fs.readdirSync(idDirectory)) {
       try {
         const manifest = validateManifest(JSON.parse(fs.readFileSync(path.join(idDirectory, version, "manifest.json"), "utf8")));
-        result.push({ manifest, source: "installed", enabled: true });
+        const origin = installationSource?.(manifest.id, manifest.version);
+        result.push({ manifest, source: "installed", ...(origin ? { installationSource: origin } : {}), enabled: true });
       } catch (error) {
         console.warn(`Ignoring invalid custom mapping ${packageId}/${version}`, error);
       }
@@ -165,7 +153,7 @@ export function listInstalledCustomMappings(app: App): CustomMappingPackageRecor
   return result.sort((a, b) => `${a.manifest.id}@${a.manifest.version}`.localeCompare(`${b.manifest.id}@${b.manifest.version}`));
 }
 
-export function installCustomMappingArchive(app: App, archivePath: string): CustomMappingPackageRecord {
+export function installCustomMappingArchive(app: App, archivePath: string, installationSource?: "local" | "community"): CustomMappingPackageRecord {
   const stat = fs.statSync(archivePath);
   if (!stat.isFile() || stat.size > MAX_ARCHIVE_BYTES) throw new Error("Mapping package is missing or larger than 50 MB");
   const archive = JSON.parse(fs.readFileSync(archivePath, "utf8")) as PackageArchive;
@@ -188,12 +176,10 @@ export function installCustomMappingArchive(app: App, archivePath: string): Cust
     if (entry && !files.has(entry)) throw new Error(`Missing entrypoint: ${entry}`);
   }
   const target = packageDirectory(app, manifest.id, manifest.version);
-  if (fs.existsSync(path.join(target, "manifest.json"))) {
-    const installed = validateManifest(JSON.parse(fs.readFileSync(path.join(target, "manifest.json"), "utf8")));
-    return { manifest: installed, source: "installed", enabled: true };
-  }
   const parent = path.dirname(target);
   const temporary = path.join(parent, `.install-${crypto.randomUUID()}`);
+  const backup = path.join(parent, `.replace-${crypto.randomUUID()}`);
+  let movedExisting = false;
   fs.mkdirSync(parent, { recursive: true });
   fs.mkdirSync(temporary);
   try {
@@ -204,12 +190,18 @@ export function installCustomMappingArchive(app: App, archivePath: string): Cust
       fs.writeFileSync(destination, contents, { flag: "wx" });
     }
     fs.writeFileSync(path.join(temporary, "manifest.json"), JSON.stringify(manifest, null, 2), { flag: "wx" });
+    if (fs.existsSync(target)) {
+      fs.renameSync(target, backup);
+      movedExisting = true;
+    }
     fs.renameSync(temporary, target);
+    if (movedExisting) fs.rmSync(backup, { recursive: true, force: true });
   } catch (error) {
     fs.rmSync(temporary, { recursive: true, force: true });
+    if (movedExisting && !fs.existsSync(target) && fs.existsSync(backup)) fs.renameSync(backup, target);
     throw error;
   }
-  return { manifest, source: "installed", enabled: true };
+  return { manifest, source: "installed", ...(installationSource ? { installationSource } : {}), enabled: true };
 }
 
 export function inspectCustomMappingArchive(archivePath: string): CustomMappingPackageManifest {
@@ -217,6 +209,23 @@ export function inspectCustomMappingArchive(archivePath: string): CustomMappingP
   if (!stat.isFile() || stat.size > MAX_ARCHIVE_BYTES) throw new Error("Mapping package is missing or larger than 50 MB");
   const archive = JSON.parse(fs.readFileSync(archivePath, "utf8")) as PackageArchive;
   return validateManifest(archive.manifest);
+}
+
+export function customMappingHasPermission(
+  app: App,
+  requestUrl: string,
+  permission: CustomMappingPermission,
+): boolean {
+  try {
+    const url = new URL(requestUrl);
+    const [id, version] = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+    if (url.protocol !== "surreality:" || url.hostname !== "package" || !id || !version) return false;
+    const manifestPath = path.join(packageDirectory(app, id, version), "manifest.json");
+    const manifest = validateManifest(JSON.parse(fs.readFileSync(manifestPath, "utf8")));
+    return manifest.permissions?.includes(permission) ?? false;
+  } catch {
+    return false;
+  }
 }
 
 function contentType(filePath: string) {

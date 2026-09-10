@@ -3,6 +3,7 @@ import { Pager } from "../Layout";
 
 const permissions = [
   ["network:fetch", "Active", "Allows HTTP and HTTPS connections. Adds https: and http: to the iframe connect-src CSP. Without this permission, fetch and WebSocket to the network are blocked."],
+  ["camera:read", "Active", "Allows navigator.mediaDevices camera access in the package iframe. The operating system may still ask the user to approve camera access for Surreality."],
   ["input:keyboard", "Active", "Forwards sanitized keydown and keyup records to onInput. Does not expose the host DOM event."],
   ["input:pointer", "Active", "Marks the mapping as interactive so Surreality can emit activate when the surface is used."],
   ["events:room", "Active", "Declares that the package participates in semantic room events via emit and onEvent."],
@@ -18,7 +19,7 @@ const permissions = [
   ["process:spawn", "Native", "Declares that a plugin may start other executables."],
   ["background:run", "Native", "Declares work that continues while no mapping surface is visible."],
   ["events:publish", "Native", "Declares plugin-to-mapping input publication."],
-  ["system:unrestricted", "Native", "Required by Format 02 plugin entrypoints. Grants user-level native access; this is not sandboxed."],
+  ["system:unrestricted", "Native", "Required by version 2 plugin entrypoints. Grants user-level native access; this is not sandboxed."],
 ];
 
 export function Permissions() {
@@ -28,7 +29,7 @@ export function Permissions() {
       <h1>Permissions</h1>
       <p className="lede">
         Requested capabilities are listed in the installation warning. Browser permissions alter a restricted frame.
-        Native permissions explain what a trusted plugin intends to do; Format 02 does not yet enforce them individually.
+        Native permissions explain what a trusted plugin intends to do; version 2 does not yet enforce them individually.
       </p>
 
       <h2>Install warning</h2>
@@ -51,7 +52,7 @@ export function Permissions() {
       </div>
 
       <h2>Content Security Policy</h2>
-      <p>Format 02 applies this policy to browser frames (network sources appear only with <code>network:fetch</code>):</p>
+      <p>Version 2 applies this policy to browser frames (network sources appear only with <code>network:fetch</code>):</p>
       <pre className="doc-pre"><code>{`default-src 'none'
 script-src surreality: (plus a per-load nonce)
 style-src surreality: 'unsafe-inline'

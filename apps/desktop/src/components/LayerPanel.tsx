@@ -3,8 +3,8 @@ import {
   ChevronRight,
   Circle,
   Frame,
+  Package,
   Pentagon,
-  Sparkles,
   Type,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type DragEvent } from "react";
@@ -22,7 +22,7 @@ function mappingIcon(mapping: Mapping, selected: boolean) {
   if (mapping.type === "custom") {
     const Icon = getCustomMapping(mapping.packageId, mapping.packageVersion)?.definition?.icon;
     if (Icon) return <Icon className={className} />;
-    return <Sparkles className={className} />;
+    return <Package className={className} />;
   }
   return <Pentagon className={className} />;
 }
@@ -103,7 +103,7 @@ export default function LayerPanel() {
 
   return (
     <div
-      className={`h-full px-1 py-1 ${dropTarget === "root" ? "bg-white/5" : ""}`}
+      className={`h-full px-2 pb-2 ${dropTarget === "root" ? "bg-white/5" : ""}`}
       onDragOver={(event) => allowDrop(event, "root")}
       onDragLeave={() => setDropTarget((current) => (current === "root" ? null : current))}
       onDrop={onDropOnRoot}
@@ -131,7 +131,7 @@ export default function LayerPanel() {
                 onDrop={(event) => onDropOnSurface(event, surface.id)}
               >
                 <div
-                  className={`flex w-full items-center gap-1 rounded-none px-1 py-1.5 text-left text-[13px] transition ${
+                  className={`flex w-full items-center gap-1 px-1 py-1.5 text-left text-[13px] transition ${
                     selected ? "bg-accent text-white" : "text-white hover:bg-white/10"
                   }`}
                 >
@@ -226,12 +226,12 @@ function MappingRow({
       onClick={onSelect}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      className={`mb-0.5 flex w-full cursor-grab items-center gap-2.5 rounded-none py-2 text-left text-[13px] transition active:cursor-grabbing ${
+      className={`mb-0.5 flex w-full cursor-grab items-center gap-2.5 py-2 text-left text-[13px] transition active:cursor-grabbing ${
         nested ? "pl-7 pr-2" : "px-2"
       } ${selected ? "bg-accent text-white" : "text-white hover:bg-white/10"}`}
     >
       <span
-        className="size-2.5 shrink-0 rounded-none"
+        className="size-2 shrink-0 rounded-full"
         style={{ background: rgbaCss(mapping.color) }}
       />
       {mappingIcon(mapping, selected)}

@@ -42,6 +42,7 @@ Package IDs use reverse-domain style lowercase identifiers. Versions use semanti
 Available permissions are:
 
 - `audio:play`
+- `camera:read`
 - `events:room`
 - `input:keyboard`
 - `input:pointer`
@@ -50,7 +51,7 @@ Available permissions are:
 - `storage:package`
 - `files:user-selected`
 
-Permissions are declared during installation. `network:fetch` changes the iframe Content Security Policy, `input:keyboard` receives sanitized key records, and `input:pointer` enables semantic activation events. The remaining capabilities are reserved for versioned SDK additions and are not implicitly granted as browser or Node access.
+Permissions are declared during installation. `network:fetch` changes the iframe Content Security Policy, `camera:read` delegates browser camera access to the package iframe, `input:keyboard` receives sanitized key records, and `input:pointer` enables semantic activation events. Camera access still requires operating-system approval. The remaining capabilities are reserved for versioned SDK additions and are not implicitly granted as browser or Node access.
 
 ## Entrypoints
 
@@ -150,7 +151,7 @@ const unsubscribe = context.inputs.subscribe(
 
 Plugin channels are exposed as `package-id/channel`. One worker runs per installed package version and can serve every mapping instance. The plugin may return a cleanup function or an object with `deactivate()`.
 
-Format 02 requires `system:unrestricted` for a plugin entrypoint. Device-specific permissions currently communicate intent during installation; they are not individually enforced. The worker is process-isolated for crash containment, but has the same user-level system access as Surreality. Bundle production dependencies and architecture-specific native libraries. OS drivers, administrator prompts, code signing, and privacy approval cannot be bypassed by the package.
+Version 2 requires `system:unrestricted` for a plugin entrypoint. Device-specific permissions currently communicate intent during installation; they are not individually enforced. The worker is process-isolated for crash containment, but has the same user-level system access as Surreality. Bundle production dependencies and architecture-specific native libraries. OS drivers, administrator prompts, code signing, and privacy approval cannot be bypassed by the package.
 
 ## Security and compatibility
 

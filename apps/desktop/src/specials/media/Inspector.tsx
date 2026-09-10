@@ -1,35 +1,23 @@
 import { Film, Link, Upload, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import type { SpecialInspectorProps } from "../types";
 import { defaultMediaConfig, type MediaConfig, type MediaFit } from "./config";
 
-const MAX_MEDIA_BYTES = 12 * 1024 * 1024;
-
 export function MediaInspector({ config, onChange }: SpecialInspectorProps<MediaConfig>) {
   const current = { ...defaultMediaConfig, ...config };
-  const fileRef = useRef<HTMLInputElement>(null);
   const [url, setUrl] = useState(current.source.startsWith("data:") ? "" : current.source);
   const [error, setError] = useState<string | null>(null);
 
-  const pickFile = async (file: File | undefined) => {
-    if (!file) return;
+  const pickFile = async () => {
     setError(null);
-    const isImage = file.type.startsWith("image/");
-    const isMp4 = file.type === "video/mp4" || file.name.toLowerCase().endsWith(".mp4");
-    if (!isImage && !isMp4) {
-      setError("Choose an MP4 or image file.");
-      return;
-    }
-    if (file.size > MAX_MEDIA_BYTES) {
-      setError("Keep uploaded media under 12 MB, or use a URL.");
-      return;
-    }
     try {
-      const source = await readDataUrl(file);
+      const result = await window.room?.importAsset("media");
+      if (!result || result.canceled) return;
+      const isImage = result.asset.mimeType.startsWith("image/");
       setUrl("");
-      onChange({ ...current, source, fileName: file.name, mediaType: isImage ? "image" : "video" });
-    } catch {
-      setError("Could not read that file.");
+      onChange({ ...current, source: result.asset.source, fileName: result.asset.fileName, mediaType: isImage ? "image" : "video" });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not import that file.");
     }
   };
 
@@ -44,10 +32,8 @@ export function MediaInspector({ config, onChange }: SpecialInspectorProps<Media
     <div className="space-y-4">
       <div>
         <p className="chrome-label mb-2">Media</p>
-        <input ref={fileRef} type="file" accept=".mp4,.gif,.png,.jpg,.jpeg,.webp,.avif,.bmp,.svg,video/mp4,image/*" className="hidden"
-          onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; void pickFile(file); }} />
         <div className="flex gap-1.5">
-          <button type="button" onClick={() => fileRef.current?.click()}
+          <button type="button" onClick={() => void pickFile()}
             className="flex h-9 min-w-0 flex-1 items-center justify-center gap-2 border border-white/15 px-2 text-[13px] text-white hover:bg-white/10">
             <Upload className="size-3.5 shrink-0" />
             <span className="truncate">{current.fileName || "Upload media"}</span>
@@ -88,15 +74,6 @@ export function MediaInspector({ config, onChange }: SpecialInspectorProps<Media
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
   return <label className="flex items-center justify-between gap-3 text-[12px] text-white/65"><span>{label}</span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="no-drag size-4 accent-accent" /></label>;
-}
-
-function readDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("Could not read file"));
-    reader.onerror = () => reject(reader.error ?? new Error("Could not read file"));
-    reader.readAsDataURL(file);
-  });
 }
 
 function isImagePath(path: string) {

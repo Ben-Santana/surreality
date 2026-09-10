@@ -31,24 +31,36 @@ function asConfig(value: unknown): Record<string, unknown> | null {
 
 export default function CustomMappingFrame({ mapping, manifest, mode, onConfigChange }: Props) {
   const ref = useRef<HTMLIFrameElement>(null);
+  const lastSentMapping = useRef<object | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const src = useMemo(() => frameUrl(manifest, mode), [manifest, mode]);
+  const readsCamera = manifest.permissions?.includes("camera:read") ?? false;
+  const frameMappingKey = JSON.stringify([
+    mapping.id,
+    mapping.name,
+    mapping.color,
+    mapping.config,
+    mapping.packageId,
+    mapping.packageVersion,
+  ]);
+  const frameMapping = useMemo(() => ({
+    id: mapping.id,
+    name: mapping.name,
+    color: mapping.color,
+    config: mapping.config,
+    packageId: mapping.packageId,
+    packageVersion: mapping.packageVersion,
+  }), [frameMappingKey]);
 
   const sendInit = () => {
     ref.current?.contentWindow?.postMessage({
       source: "surreality-host",
       type: "initialize",
       mode,
-      mapping: {
-        id: mapping.id,
-        name: mapping.name,
-        color: mapping.color,
-        config: mapping.config,
-        packageId: mapping.packageId,
-        packageVersion: mapping.packageVersion,
-      },
+      mapping: frameMapping,
       manifest,
     }, "*");
+    lastSentMapping.current = frameMapping;
   };
 
   useEffect(() => {
@@ -82,23 +94,17 @@ export default function CustomMappingFrame({ mapping, manifest, mode, onConfigCh
   }, [manifest.id, mapping.id, mode, onConfigChange]);
 
   useEffect(() => {
-    if (status === "ready") {
+    if (status === "ready" && lastSentMapping.current !== frameMapping) {
       ref.current?.contentWindow?.postMessage({
         source: "surreality-host",
         type: "update",
         mode,
-        mapping: {
-          id: mapping.id,
-          name: mapping.name,
-          color: mapping.color,
-          config: mapping.config,
-          packageId: mapping.packageId,
-          packageVersion: mapping.packageVersion,
-        },
+        mapping: frameMapping,
         manifest,
       }, "*");
+      lastSentMapping.current = frameMapping;
     }
-  }, [manifest, mapping, mode, status]);
+  }, [frameMapping, manifest, mode, status]);
 
   useEffect(() => onCustomMappingEvent((event) => {
     if (event.targetId && event.targetId !== mapping.id) return;
@@ -151,7 +157,8 @@ export default function CustomMappingFrame({ mapping, manifest, mode, onConfigCh
       <iframe
         ref={ref}
         src={src}
-        sandbox="allow-scripts"
+        sandbox={readsCamera ? "allow-scripts allow-same-origin" : "allow-scripts"}
+        allow={readsCamera ? "camera" : undefined}
         title={`${manifest.name} ${mode}`}
         className="block h-full w-full border-0 bg-transparent"
         onLoad={sendInit}

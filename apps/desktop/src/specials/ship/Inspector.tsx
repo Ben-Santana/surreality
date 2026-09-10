@@ -3,6 +3,7 @@ import type { SpecialInspectorProps } from "../types";
 
 import { defaultShipConfig } from "./config";
 import { SOUND_PRESET_LABELS, SOUND_PRESETS, type SoundPresetId } from "../sound/config";
+import InspectorSelect from "../../components/InspectorSelect";
 
 export function ShipInspector({ config, onChange }: SpecialInspectorProps<ShipConfig>) {
   const current = { ...defaultShipConfig, ...config };
@@ -37,18 +38,15 @@ export function ShipInspector({ config, onChange }: SpecialInspectorProps<ShipCo
               className="w-12 rounded border border-white/15 bg-black/25 px-2 py-1 text-center uppercase outline-none focus:border-accent"
             />
           </label>
-          <label className="block space-y-1.5 text-[13px] text-white">
+          <div className="space-y-1.5 text-[13px] text-white">
             <span className="chrome-label">Enemy hit sound</span>
-            <select
+            <InspectorSelect
+              ariaLabel="Enemy hit sound"
               value={current.minigameHitSound}
-              onChange={(event) => onChange({ ...current, minigameHitSound: event.target.value as SoundPresetId })}
-              className="h-9 w-full border border-white/15 bg-[#111114] px-2 text-white outline-none focus:border-accent"
-            >
-              {SOUND_PRESETS.map((preset) => (
-                <option key={preset} value={preset}>{SOUND_PRESET_LABELS[preset]}</option>
-              ))}
-            </select>
-          </label>
+              onChange={(minigameHitSound) => onChange({ ...current, minigameHitSound: minigameHitSound as SoundPresetId })}
+              options={SOUND_PRESETS.map((preset) => ({ id: preset, label: SOUND_PRESET_LABELS[preset] }))}
+            />
+          </div>
           <label className="block space-y-1.5">
             <span className="chrome-label">Hit volume</span>
             <input

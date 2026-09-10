@@ -65,7 +65,7 @@ export function Plugins() {
         <li>There is no package signing or publisher verification yet.</li>
         <li>There is no dependency installer. Bundle production dependencies and native binaries.</li>
         <li>Worker data is broadcast to open Surreality windows and then filtered by channel subscribers.</li>
-        <li>Plugin configuration and bidirectional mapping-to-plugin requests are not part of Format 02.</li>
+        <li>Plugin configuration and bidirectional mapping-to-plugin requests are not part of version 2.</li>
       </ul>
       <Pager path="/plugins" />
     </article>

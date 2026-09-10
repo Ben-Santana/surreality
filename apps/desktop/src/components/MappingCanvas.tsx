@@ -11,6 +11,7 @@ type Props = {
   grid?: boolean;
   gridStep?: number;
   handles?: boolean;
+  transparent?: boolean;
   layer?: "stage" | "handles";
   className?: string;
   canvasRef?: RefObject<HTMLCanvasElement | null>;
@@ -40,6 +41,7 @@ function paint(
     grid: boolean;
     gridStep: number;
     handles: boolean;
+    transparent: boolean;
     layer: "stage" | "handles";
   },
 ) {
@@ -64,6 +66,7 @@ function paint(
   renderStage(ctx, mappings, {
     width: rect.width,
     height: rect.height,
+    transparent: options.transparent,
     surfaces,
     edit: options.edit,
     selectedId: options.selectedId,
@@ -83,6 +86,7 @@ export default function MappingCanvas({
   grid = false,
   gridStep = GRID_STEPS.medium,
   handles = true,
+  transparent = false,
   layer = "stage",
   className,
   canvasRef,
@@ -95,10 +99,10 @@ export default function MappingCanvas({
   const ref = canvasRef ?? internalRef;
   const mappingsRef = useRef(mappings);
   const surfacesRef = useRef(surfaces);
-  const optionsRef = useRef({ edit, selectedId, dropTargetId, grid, gridStep, handles, layer });
+  const optionsRef = useRef({ edit, selectedId, dropTargetId, grid, gridStep, handles, transparent, layer });
   mappingsRef.current = mappings;
   surfacesRef.current = surfaces;
-  optionsRef.current = { edit, selectedId, dropTargetId, grid, gridStep, handles, layer };
+  optionsRef.current = { edit, selectedId, dropTargetId, grid, gridStep, handles, transparent, layer };
 
   useEffect(() => {
     const canvas = ref.current;
@@ -120,8 +124,8 @@ export default function MappingCanvas({
     const canvas = ref.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
-    paint(ctx, canvas, mappings, surfaces, { edit, selectedId, dropTargetId, grid, gridStep, handles, layer });
-  }, [dropTargetId, edit, grid, gridStep, handles, layer, mappings, ref, selectedId, surfaces]);
+    paint(ctx, canvas, mappings, surfaces, { edit, selectedId, dropTargetId, grid, gridStep, handles, transparent, layer });
+  }, [dropTargetId, edit, grid, gridStep, handles, layer, mappings, ref, selectedId, surfaces, transparent]);
 
   const hasClock = layer === "stage" && mappings.some(
     (mapping) => mapping.type === "text" && mapping.contentMode === "clock",

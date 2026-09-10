@@ -213,7 +213,6 @@ export function containsMapping(mapping: Mapping, point: Point): boolean {
   if (visibleHandles(mapping).some((handle) => hitHandle(point, handle.point))) {
     return true;
   }
-  if (hitHandle(point, mappingAnchor(mapping))) return true;
   return mappingContainsBody(mapping, point);
 }
 
@@ -237,11 +236,9 @@ export type HandleHit = {
 };
 
 export function visibleHandles(mapping: Mapping): HandleHit[] {
-  const handles: HandleHit[] = mapping.vertices
+  return mapping.vertices
     .map((point, index) => ({ kind: "vertex" as const, index, point }))
     .filter((handle) => !isCircleGeometry(mapping) || handle.index !== 0);
-  handles.push({ kind: "anchor", point: mappingAnchor(mapping) });
-  return handles;
 }
 
 export function hitTestHandle(mapping: Mapping, point: Point): HandleHit | null {

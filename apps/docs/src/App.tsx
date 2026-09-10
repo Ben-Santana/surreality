@@ -9,6 +9,7 @@ import { Packaging } from "./pages/Packaging";
 import { Permissions } from "./pages/Permissions";
 import { RuntimeApi } from "./pages/RuntimeApi";
 import { Plugins } from "./pages/Plugins";
+import { StyleGuide } from "./pages/StyleGuide";
 
 function page(path: DocPath) {
   if (path === "/" || path === "/quickstart") return <Home path={path} />;
@@ -16,6 +17,7 @@ function page(path: DocPath) {
   if (path === "/runtime-api") return <RuntimeApi />;
   if (path === "/entrypoints") return <Entrypoints />;
   if (path === "/plugins") return <Plugins />;
+  if (path === "/style-guide") return <StyleGuide />;
   if (path === "/events") return <Events />;
   if (path === "/permissions") return <Permissions />;
   return <Packaging />;

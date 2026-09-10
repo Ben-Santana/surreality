@@ -73,18 +73,50 @@ test("installer validates, extracts, and lists a package", () => {
   assert.ok(!fs.existsSync(path.join(userData, "custom-mappings/local.installed/1.0.0")));
 });
 
-test("current mappings are distributed as reinstallable .surreality files", () => {
-  const files = fs.readdirSync(path.resolve("mappings")).filter((name) => name.endsWith(".surreality")).sort();
-  assert.deepEqual(files, [
-    "room.mapping.dithered-media-1.0.0.surreality",
-    "room.mapping.feynman-1.0.0.surreality",
-    "room.mapping.media-1.0.0.surreality",
-    "room.mapping.ship-1.0.0.surreality",
-    "room.mapping.sound-1.0.0.surreality",
-  ]);
-  for (const file of files) {
-    const archive = JSON.parse(fs.readFileSync(path.resolve("mappings", file), "utf8"));
-    assert.equal(archive.manifest.manifestVersion, 2);
-    assert.ok(archive.files[archive.manifest.entrypoints.mapping]);
-  }
+test("reinstalling the same package version replaces its files", () => {
+  const project = fs.mkdtempSync(path.join(os.tmpdir(), "surreality-reinstaller-"));
+  const archivePath = path.join(project, "replace.surreality");
+  const userData = path.join(project, "user-data");
+  const archive = {
+    manifest: {
+      manifestVersion: 2,
+      id: "local.replace",
+      name: "Replace",
+      version: "1.0.0",
+      configVersion: 1,
+      description: "Replacement test",
+      geometry: "quad",
+      contentSize: { width: 640, height: 360 },
+      defaultColor: { r: 255, g: 255, b: 255, a: 255 },
+      defaultConfig: {},
+      entrypoints: { mapping: "mapping.js" },
+      permissions: [],
+    },
+    files: { "mapping.js": "export default 'first';" },
+  };
+  fs.writeFileSync(archivePath, JSON.stringify(archive));
+  const moduleUrl = pathToFileURL(path.resolve("electron/customMappings.ts")).href;
+  const code = `
+    const fs = await import("node:fs");
+    const api = await import(${JSON.stringify(moduleUrl)});
+    const app = { getPath: () => ${JSON.stringify(userData)} };
+    const archivePath = ${JSON.stringify(archivePath)};
+    api.installCustomMappingArchive(app, archivePath);
+    const archive = JSON.parse(fs.readFileSync(archivePath, "utf8"));
+    archive.files["mapping.js"] = "export default 'second';";
+    fs.writeFileSync(archivePath, JSON.stringify(archive));
+    api.installCustomMappingArchive(app, archivePath);
+    process.stdout.write(fs.readFileSync(${JSON.stringify(path.join(userData, "custom-mappings/local.replace/1.0.0/mapping.js"))}, "utf8"));
+  `;
+  const result = spawnSync(process.execPath, ["--experimental-strip-types", "--input-type=module", "--eval", code], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "export default 'second';");
+});
+
+test("custom mapping archives are not bundled with the desktop app", () => {
+  const directory = path.resolve("mappings");
+  const files = fs.existsSync(directory)
+    ? fs.readdirSync(directory).filter((name) => name.endsWith(".surreality"))
+    : [];
+  assert.deepEqual(files, []);
 });
