@@ -11,13 +11,16 @@ Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
     const user = await requiredUser(request);
-    const body = await request.json() as { releaseId?: string; name?: string; description?: string; removeThumbnail?: boolean; thumbnail?: { mimeType?: string; data?: string } };
+    const body = await request.json() as { releaseId?: string; name?: string; description?: string; tags?: unknown; removeThumbnail?: boolean; thumbnail?: { mimeType?: string; data?: string } };
     const releaseId = body.releaseId?.trim() ?? "";
     const name = body.name?.trim() ?? "";
     const description = body.description?.trim() ?? "";
     if (!releaseId) throw new Error("Release id is required");
     if (!name || name.length > 80) throw new Error("Listing name must be between 1 and 80 characters");
     if (description.length > 500) throw new Error("Description must be 500 characters or fewer");
+    const allowedTags = new Set(["media", "games", "audio", "visuals", "tools"]);
+    if (!Array.isArray(body.tags) || body.tags.length < 1 || body.tags.length > 3 || !body.tags.every((tag) => typeof tag === "string" && allowedTags.has(tag)) || new Set(body.tags).size !== body.tags.length) throw new Error("Choose between 1 and 3 valid categories");
+    const tags = body.tags as string[];
     const client = serviceClient();
     const release = await client.from("package_releases").select("id,owner_id,thumbnail_path").eq("id", releaseId).maybeSingle();
     if (release.error) throw release.error;
@@ -40,6 +43,7 @@ Deno.serve(async (request) => {
     const update = await client.from("package_releases").update({
       listing_name: name,
       listing_description: description,
+      listing_tags: tags,
       ...(body.thumbnail || body.removeThumbnail ? { thumbnail_path: thumbnailPath } : {}),
     }).eq("id", releaseId);
     if (update.error) {

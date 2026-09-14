@@ -450,7 +450,7 @@ app.whenReady().then(() => {
     }
     finally { prepared.cleanup(); }
   });
-  ipcMain.handle("community:update-listing", (_event, releaseId: string, listing: { name?: string; description?: string; removeThumbnail?: boolean }) => cloud?.updateListing(releaseId, listing));
+  ipcMain.handle("community:update-listing", (_event, releaseId: string, listing: { name?: string; description?: string; tags: import("../src/types").CommunityPackageTag[]; removeThumbnail?: boolean; thumbnail?: { mimeType: string; data: string } }) => cloud?.updateListing(releaseId, listing));
   ipcMain.handle("community:report", (_event, releaseId: string, reason: string) => cloud?.reportRelease(releaseId, reason));
   ipcMain.handle("community:set-saved", (_event, releaseId: string, saved: boolean) => cloud?.setSaved(releaseId, saved));
   ipcMain.handle("community:download-install", async (_event, releaseId: string) => {

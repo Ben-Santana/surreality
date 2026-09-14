@@ -17,6 +17,7 @@ import MappingCanvas, { canvasPoint } from "./MappingCanvas";
 import MappingLayers from "./MappingLayers";
 import { CustomMappingRuntimeFrames } from "./CustomMappingOverlays";
 import { CustomMappingRuntimeOverlays } from "../customMappings/runtime";
+import { useSurfaceTransitions } from "./useSurfaceTransitions";
 
 type Drag =
   | { type: "mapping"; id: string; kind: "vertex"; index: number }
@@ -60,7 +61,8 @@ export default function Stage() {
 
   // Mappings store unskewed geometry; the stage always works with how they
   // currently appear through their surface.
-  const shown = useMemo(() => displayMappings(mappings, surfaces), [mappings, surfaces]);
+  const projected = useMemo(() => displayMappings(mappings, surfaces), [mappings, surfaces]);
+  const shown = useSurfaceTransitions(mappings, projected);
 
   const pointFromEvent = (event: { clientX: number; clientY: number }): Point | null => {
     const canvas = canvasRef.current;

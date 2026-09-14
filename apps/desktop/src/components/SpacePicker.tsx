@@ -167,7 +167,7 @@ export default function SpacePicker() {
   return (
     <div className="workspace-shell pointer-events-auto absolute inset-0 z-40 flex overflow-hidden bg-[#08080a] text-white">
       <aside className="workspace-rail relative z-20 flex w-[224px] shrink-0 flex-col border-r border-white/8 bg-[#0c0c0f]">
-        <div className="drag-region h-16 shrink-0" />
+        <div className="drag-region h-[72px] shrink-0 border-b border-white/8" />
         <nav className="flex-1 px-3 py-3 [&>button]:cursor-pointer" aria-label="Workspace">
           <button type="button" onClick={() => setView("spaces")} className={`workspace-nav-item ${view === "spaces" ? "workspace-nav-item-active" : ""}`}>
             <Grid2X2 className="size-4 shrink-0" />

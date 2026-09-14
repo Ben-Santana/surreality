@@ -186,6 +186,7 @@ export type CloudState = {
 };
 
 export type CommunityReleaseStatus = "published" | "pending_review" | "rejected" | "taken_down";
+export type CommunityPackageTag = "media" | "games" | "audio" | "visuals" | "tools";
 export type CommunityRelease = {
   releaseId: string;
   packageId: string;
@@ -204,6 +205,7 @@ export type CommunityRelease = {
   thumbnailUrl?: string;
   listingName?: string;
   listingDescription?: string;
+  listingTags?: CommunityPackageTag[];
   saved?: boolean;
   installationSource?: "local" | "community";
   firstDownloadedAt?: string;
@@ -276,7 +278,7 @@ export type RoomAPI = {
     setUsername: (username: string) => Promise<CloudState>;
     uploadFromFile: () => Promise<{ canceled: boolean; release?: CommunityRelease }>;
     chooseThumbnail: () => Promise<{ canceled: boolean; previewUrl?: string; thumbnail?: { mimeType: string; data: string } }>;
-    updateListing: (releaseId: string, listing: { name: string; description: string; removeThumbnail?: boolean; thumbnail?: { mimeType: string; data: string } }) => Promise<{ thumbnailRemoved?: boolean; thumbnailUrl?: string }>;
+    updateListing: (releaseId: string, listing: { name: string; description: string; tags: CommunityPackageTag[]; removeThumbnail?: boolean; thumbnail?: { mimeType: string; data: string } }) => Promise<{ thumbnailRemoved?: boolean; thumbnailUrl?: string }>;
     downloadAndInstall: (releaseId: string) => Promise<{ canceled: boolean; installed?: CustomMappingPackageRecord }>;
     report: (releaseId: string, reason: string) => Promise<void>;
     setSaved: (releaseId: string, saved: boolean) => Promise<void>;
