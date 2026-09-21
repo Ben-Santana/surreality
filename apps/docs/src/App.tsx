@@ -49,7 +49,7 @@ export default function App() {
   }, [path]);
 
   useEffect(() => {
-    document.title = isDocs ? "Surreality developer guide" : "Surreality — Make room for the unreal";
+    document.title = isDocs ? "Surreality developer guide" : "Surreality";
   }, [isDocs]);
 
   return isDocs ? <Layout path={path}>{page(path)}</Layout> : <Landing />;
