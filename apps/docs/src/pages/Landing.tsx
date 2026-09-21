@@ -1,4 +1,4 @@
-import { Apple, ArrowUpRight, Download, Monitor } from "lucide-react";
+import { Apple, ArrowUpRight, Download, Monitor, Terminal } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { SurrealityLockup } from "../Brand";
 import "../landing.css";
@@ -6,6 +6,7 @@ import "../landing.css";
 const downloads = [
   { name: "macOS", detail: "Apple silicon · .dmg", href: downloadUrl(import.meta.env.VITE_DOWNLOAD_MAC_URL, "Surreality-1.0.0-arm64.dmg"), size: "132 MB", Icon: Apple },
   { name: "Windows", detail: "64-bit · .exe", href: downloadUrl(import.meta.env.VITE_DOWNLOAD_WINDOWS_URL, "Surreality-Setup-1.0.0-x64.exe"), size: "115 MB", Icon: Monitor },
+  { name: "Arch Linux", detail: "x86_64", href: downloadUrl(import.meta.env.VITE_DOWNLOAD_LINUX_URL, "surreality-1.0.0-1-x86_64.pkg.tar.zst"), size: "122 MB", Icon: Terminal },
 ];
 
 function downloadUrl(configured: string | undefined, file: string) {

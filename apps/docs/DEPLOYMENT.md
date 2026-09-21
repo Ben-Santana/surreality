@@ -16,6 +16,7 @@ https://github.com/Ben-Santana/surreality/releases/tag/v1.0.0-preview.1:
 
 - `apps/desktop/release/Surreality-1.0.0-arm64.dmg`
 - `apps/desktop/release/Surreality-Setup-1.0.0-x64.exe`
+- `apps/desktop/release/surreality-1.0.0-1-x86_64.pkg.tar.zst`
 
 The Mac asset is ad-hoc signed and unnotarized; Gatekeeper can still block it.
 
@@ -25,6 +26,7 @@ actual download URL into Vercel Project Settings → Environment Variables:
 
 - `VITE_DOWNLOAD_MAC_URL`
 - `VITE_DOWNLOAD_WINDOWS_URL`
+- `VITE_DOWNLOAD_LINUX_URL`
 
 Enable the variables for Production and Preview as needed, then redeploy. Vite
 embeds them at build time. Use permanent public HTTPS asset URLs, not temporary

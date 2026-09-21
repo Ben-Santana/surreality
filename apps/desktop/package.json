@@ -17,7 +17,8 @@
     "create:mapping": "node scripts/create-mapping.mjs",
     "pack:mapping": "node scripts/pack-mapping.mjs",
     "preview": "vite preview",
-    "start": "env -u ELECTRON_RUN_AS_NODE electron ."
+    "start": "env -u ELECTRON_RUN_AS_NODE electron .",
+    "dist:arch": "npm run build && electron-builder --linux pacman --x64"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
@@ -84,6 +85,59 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
+    },
+    "linux": {
+      "executableName": "surreality",
+      "icon": "build/icon.png",
+      "category": "Graphics",
+      "target": [
+        {
+          "target": "pacman",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "syncDesktopName": true
+    },
+    "pacman": {
+      "packageName": "surreality",
+      "maintainer": "Ben-Santana",
+      "artifactName": "surreality-${version}-1-x86_64.pkg.tar.zst",
+      "compression": "zstd",
+      "depends": [
+        "alsa-lib",
+        "at-spi2-core",
+        "cairo",
+        "dbus",
+        "expat",
+        "gcc-libs",
+        "glib2",
+        "glibc",
+        "gtk3",
+        "libcups",
+        "libdrm",
+        "libx11",
+        "libxcb",
+        "libxcomposite",
+        "libxdamage",
+        "libxext",
+        "libxfixes",
+        "libxkbcommon",
+        "libxrandr",
+        "mesa",
+        "nspr",
+        "nss",
+        "pango",
+        "xdg-utils"
+      ],
+      "fpm": [
+        "--description",
+        "Projection mapping for rooms, surfaces, and live visuals."
+      ]
     }
-  }
+  },
+  "description": "Projection mapping for rooms, surfaces, and live visuals.",
+  "homepage": "https://github.com/Ben-Santana/surreality",
+  "desktopName": "surreality.desktop"
 }
