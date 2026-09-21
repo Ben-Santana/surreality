@@ -28,7 +28,7 @@ export function Layout({ path, children }: { path: DocPath; children: ReactNode 
     <div className="site-shell">
       <a className="skip-link" href="#main-content">Skip to content</a>
       <header className="topbar">
-        <a className="wordmark" href="#/" aria-label="Surreality documentation home">
+        <a className="wordmark" href="/" aria-label="Surreality home">
           <SurrealityMark />
         </a>
         <span className="topbar-title">DEV DOCS</span>

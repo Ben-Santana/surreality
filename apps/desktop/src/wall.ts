@@ -1,4 +1,12 @@
-import { asQuad, dist, isValidWall, isValidWarpQuad, mappingAnchor, pointInPolygon } from "./geometry";
+import {
+  asQuad,
+  dist,
+  isCircleGeometry,
+  isValidWall,
+  isValidWarpQuad,
+  mappingAnchor,
+  pointInPolygon,
+} from "./geometry";
 import { projectPoint, projectVertices } from "./quadTransform";
 import type { Mapping, Point, Quad, Surface, WallSize } from "./types";
 
@@ -94,9 +102,33 @@ export function displayVertices(mapping: Mapping, surfaces: Surface[]): Point[] 
 }
 
 export function displayMapping(mapping: Mapping, surfaces: Surface[]): Mapping {
-  const vertices = displayVertices(mapping, surfaces);
+  const surface = surfaceById(surfaces, mapping.surfaceId);
+  const vertices = surface ? wallToScreen(surface, mapping.vertices) : mapping.vertices;
   if (vertices === mapping.vertices) return mapping;
-  return { ...mapping, vertices } as Mapping;
+
+  if (isCircleGeometry(mapping)) {
+    const center = mapping.vertices[0];
+    const rimU = mapping.vertices[1];
+    const rimV = mapping.vertices[2];
+    if (center && rimU && rimV && surface) {
+      const axisU = { x: rimU.x - center.x, y: rimU.y - center.y };
+      const axisV = { x: rimV.x - center.x, y: rimV.y - center.y };
+      const perimeter = Array.from({ length: 64 }, (_, index) => {
+        const angle = (index / 64) * Math.PI * 2;
+        return {
+          x: center.x + axisU.x * Math.cos(angle) + axisV.x * Math.sin(angle),
+          y: center.y + axisU.y * Math.cos(angle) + axisV.y * Math.sin(angle),
+        };
+      });
+      return {
+        ...mapping,
+        vertices,
+        projectedOutline: wallToScreen(surface, perimeter),
+      } as Mapping;
+    }
+  }
+
+  return { ...mapping, vertices, projectedOutline: undefined } as Mapping;
 }
 
 export function displayMappings(mappings: Mapping[], surfaces: Surface[]): Mapping[] {

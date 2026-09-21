@@ -47,7 +47,10 @@ button:disabled,[role=button][aria-disabled=true]{cursor:not-allowed}
 
 /* The stage is the product canvas and intentionally remains black. */
 .editor-stage{--color-white:#fff;--color-black:#000;color:#fff;background:#000!important}
-.presentation-cursor,.presentation-cursor *{cursor:none!important}
+.presentation-cursor-hidden,.presentation-cursor-hidden *{cursor:none!important}
+.presentation-cursor-crosshair,.presentation-cursor-crosshair *{cursor:crosshair!important}
+.presentation-cursor-default,.presentation-cursor-default *{cursor:default!important}
+.presentation-cursor-dot,.presentation-cursor-dot *{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='6' r='4' fill='white' stroke='black' stroke-width='1'/%3E%3C/svg%3E") 6 6,crosshair!important}
 
 /* All application chrome follows the developer-docs system. */
 .app-chrome{--paper:#202020;--surface:#2b2b2b;--ink:#f1f1ef;--muted:#a5a5a0;--line:#454545;--color-white:var(--ink);--color-black:var(--paper);--color-zinc-100:var(--ink);--color-zinc-400:var(--muted);--color-accent:var(--signal);--color-panel:var(--paper);--color-panel-2:var(--surface);--color-line:var(--line);--color-muted:var(--muted);color:var(--ink);color-scheme:dark;font-family:var(--body);letter-spacing:0}

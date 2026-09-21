@@ -3,6 +3,7 @@ import {
   Package,
   Pencil,
   Plus,
+  Settings,
   Trash2,
   UserRound,
 } from "lucide-react";
@@ -12,6 +13,8 @@ import type { Mapping, Point, Space } from "../types";
 import { showAuthDialog, useCloudState } from "../cloud";
 import CommunityLibrary, { type LibraryTab } from "./CommunityLibrary";
 import { UiButton, UiLabel } from "./ui/Chrome";
+import StartupSettings from "./StartupSettings";
+import { useRoomStoreHydrated } from "../useRoomStoreHydrated";
 
 function relativeDate(timestamp: number) {
   const minutes = Math.floor(Math.max(0, Date.now() - timestamp) / 60_000);
@@ -144,25 +147,20 @@ export default function SpacePicker() {
   const spaces = useRoomStore((state) => state.spaces);
   const createBlankSpace = useRoomStore((state) => state.createBlankSpace);
   const cloud = useCloudState();
-  const [view, setView] = useState<"spaces" | LibraryTab>(() => {
+  const [view, setView] = useState<"spaces" | "settings" | LibraryTab>(() => {
     const requested = window.localStorage.getItem("surreality-library-view");
     if (requested === "downloads") return "installed";
     if (requested === "uploads") return "published";
     return requested === "discover" || requested === "saved" || requested === "installed" || requested === "published" || requested === "moderation" ? requested : "spaces";
   });
-  const [hydrated, setHydrated] = useState(() => useRoomStore.persist.hasHydrated());
-
-  useEffect(() => {
-    if (hydrated) return;
-    return useRoomStore.persist.onFinishHydration(() => setHydrated(true));
-  }, [hydrated]);
+  const hydrated = useRoomStoreHydrated();
 
   const sorted = [...spaces].sort((left, right) => right.updatedAt - left.updatedAt);
   const selectCommunityTab = (tab: LibraryTab) => {
     window.localStorage.setItem("surreality-library-view", tab);
     setView(tab);
   };
-  const packageView = view !== "spaces";
+  const packageView = view !== "spaces" && view !== "settings";
 
   return (
     <div className="workspace-shell pointer-events-auto absolute inset-0 z-40 flex overflow-hidden bg-[#08080a] text-white">
@@ -178,6 +176,10 @@ export default function SpacePicker() {
             <Package className="size-4 shrink-0" />
             <span>Packages</span>
           </button>
+          <button type="button" onClick={() => setView("settings")} className={`workspace-nav-item mt-1 ${view === "settings" ? "workspace-nav-item-active" : ""}`}>
+            <Settings className="size-4 shrink-0" />
+            <span>Settings</span>
+          </button>
         </nav>
         <div className="border-t border-white/8 p-3">
           <button type="button" onClick={showAuthDialog} className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left hover:bg-white/[0.045]">
@@ -189,7 +191,7 @@ export default function SpacePicker() {
 
       <main className="workspace-main relative min-w-0 flex-1 overflow-hidden">
         <header className="workspace-topbar drag-region relative z-10 flex h-16 items-center justify-between border-b border-white/8 bg-[#08080a]/90 pl-7 pr-3.5 backdrop-blur-xl md:pl-10 md:pr-3.5">
-          <UiLabel>{view === "spaces" ? "Your spaces" : "Packages"}</UiLabel>
+          <UiLabel>{view === "spaces" ? "Your spaces" : view === "settings" ? "Settings" : "Packages"}</UiLabel>
           {view === "spaces" ? <UiButton tone="primary" type="button" className="no-drag flex h-9 items-center gap-2 px-4" onClick={createBlankSpace}>
             <Plus className="size-4" strokeWidth={2.5} /> Add space
           </UiButton> : null}
@@ -210,7 +212,7 @@ export default function SpacePicker() {
               </div>
             )}
           </div>
-        </div> : <CommunityLibrary tab={view} onTabChange={selectCommunityTab} />}
+        </div> : view === "settings" ? <StartupSettings spaces={spaces} /> : <CommunityLibrary tab={view} onTabChange={selectCommunityTab} />}
       </main>
     </div>
   );

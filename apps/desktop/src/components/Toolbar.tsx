@@ -1,6 +1,8 @@
 import {
   ChevronDown,
   Circle,
+  Crosshair,
+  EyeOff,
   Frame,
   Film,
   Grid3x3,
@@ -19,7 +21,7 @@ import {
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CORE_MEDIA_PACKAGE_ID } from "../customMappings/registry";
 import { useRoomStore } from "../store";
-import type { DisplayInfo, GridSize, Tool } from "../types";
+import type { DisplayInfo, GridSize, PresentationCursor, Tool } from "../types";
 import Flyout, { eventInside } from "./Flyout";
 
 const createTools: { id: Exclude<Tool, "select" | "custom">; label: string; shortcut: string; icon: ReactNode }[] = [
@@ -35,7 +37,14 @@ const gridSizes: { id: GridSize; label: string }[] = [
   { id: "large", label: "Large" },
 ];
 
-type MenuId = "add" | "grid" | "projector";
+const presentationCursors: { id: PresentationCursor; label: string; icon: ReactNode }[] = [
+  { id: "crosshair", label: "Crosshair", icon: <Crosshair className="size-4" /> },
+  { id: "dot", label: "White circle", icon: <Circle className="size-3 fill-current" /> },
+  { id: "hidden", label: "Hidden", icon: <EyeOff className="size-4" /> },
+  { id: "default", label: "Normal mouse", icon: <MousePointer2 className="size-4" /> },
+];
+
+type MenuId = "add" | "grid" | "cursor" | "projector";
 
 export default function Toolbar({ onOpenCustomMappings, compact = false }: { onOpenCustomMappings: () => void; compact?: boolean }) {
   const tool = useRoomStore((state) => state.tool);
@@ -50,6 +59,8 @@ export default function Toolbar({ onOpenCustomMappings, compact = false }: { onO
   const toggleSnapToGrid = useRoomStore((state) => state.toggleSnapToGrid);
   const gridSize = useRoomStore((state) => state.gridSize);
   const setGridSize = useRoomStore((state) => state.setGridSize);
+  const presentationCursor = useRoomStore((state) => state.presentationCursor);
+  const setPresentationCursor = useRoomStore((state) => state.setPresentationCursor);
   const projectorOpen = useRoomStore((state) => state.projectorOpen);
   const setProjectorOpen = useRoomStore((state) => state.setProjectorOpen);
   const canUndo = useRoomStore((state) => state.past.length > 0);
@@ -66,6 +77,8 @@ export default function Toolbar({ onOpenCustomMappings, compact = false }: { onO
   const gridMenuRef = useRef<HTMLDivElement>(null);
   const projectorRef = useRef<HTMLDivElement>(null);
   const projectorMenuRef = useRef<HTMLDivElement>(null);
+  const cursorRef = useRef<HTMLDivElement>(null);
+  const cursorMenuRef = useRef<HTMLDivElement>(null);
   const createActive = tool !== "select" && editMode;
 
   const toggleMenu = (id: MenuId) => {
@@ -97,6 +110,9 @@ export default function Toolbar({ onOpenCustomMappings, compact = false }: { onO
         setMenu(null);
       }
       if (!eventInside(event, projectorRef.current, projectorMenuRef.current) && menu === "projector") {
+        setMenu(null);
+      }
+      if (!eventInside(event, cursorRef.current, cursorMenuRef.current) && menu === "cursor") {
         setMenu(null);
       }
     };
@@ -315,6 +331,45 @@ export default function Toolbar({ onOpenCustomMappings, compact = false }: { onO
         <Presentation className="size-4" />
         <span className="hidden md:inline">{editMode ? "Present" : "Editing"}</span>
       </button>
+
+      <div className="relative" ref={cursorRef}>
+        <button
+          type="button"
+          title="Presentation cursor"
+          aria-label="Choose presentation cursor"
+          aria-expanded={menu === "cursor"}
+          onClick={() => toggleMenu("cursor")}
+          className={`flex h-8 items-center gap-1.5 rounded-none px-2 text-[13px] transition ${
+            menu === "cursor" ? "bg-accent text-white" : "text-white/70 hover:bg-white/10 hover:text-white"
+          }`}
+        >
+          {presentationCursors.find((item) => item.id === presentationCursor)?.icon}
+          <ChevronDown className="size-3 opacity-70" />
+        </button>
+        <Flyout open={menu === "cursor"} anchorRef={cursorRef} contentRef={cursorMenuRef} placement="bottom-end" className="w-44">
+          <div className="rounded-none border border-white/10 bg-[#111114] p-1 shadow-2xl">
+            <p className="px-2 pb-1 pt-1.5 font-mono text-[9px] uppercase tracking-[0.22em] text-white/35">
+              Presentation cursor
+            </p>
+            {presentationCursors.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`flex h-8 w-full items-center gap-2 rounded-none px-2 text-left text-[13px] hover:bg-white/10 ${
+                  presentationCursor === item.id ? "bg-accent/15 text-accent" : "text-white"
+                }`}
+                onClick={() => {
+                  setPresentationCursor(item.id);
+                  closeMenus();
+                }}
+              >
+                <span className="flex size-4 items-center justify-center opacity-80">{item.icon}</span>
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </Flyout>
+      </div>
 
       <div className="relative" ref={projectorRef}>
         <button

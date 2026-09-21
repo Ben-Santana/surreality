@@ -35,6 +35,7 @@ export default function Stage() {
   const showGrid = useRoomStore((state) => state.showGrid);
   const snapToGrid = useRoomStore((state) => state.snapToGrid);
   const gridSize = useRoomStore((state) => state.gridSize);
+  const presentationCursor = useRoomStore((state) => state.presentationCursor);
   const tool = useRoomStore((state) => state.tool);
   const setEditMode = useRoomStore((state) => state.setEditMode);
   const select = useRoomStore((state) => state.select);
@@ -80,7 +81,7 @@ export default function Stage() {
   };
 
   return (
-    <div className={`editor-stage absolute inset-0 bg-black ${editMode ? "" : "presentation-cursor"}`}>
+    <div className={`editor-stage absolute inset-0 bg-black ${editMode ? "" : `presentation-cursor-${presentationCursor}`}`}>
       <MappingCanvas
         canvasRef={canvasRef}
         mappings={[]}
@@ -91,7 +92,7 @@ export default function Stage() {
         grid={Boolean(editMode && (showGrid || !spaceEntered))}
         gridStep={GRID_STEPS[gridSize]}
         handles={false}
-        className={`block h-full w-full touch-none ${editMode ? "cursor-crosshair" : "cursor-none"}`}
+        className={`block h-full w-full touch-none ${editMode ? "cursor-crosshair" : ""}`}
         onPointerDown={(event) => {
           if (!spaceEntered) return;
           if (event.button === 2) return;

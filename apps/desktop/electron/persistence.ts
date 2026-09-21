@@ -65,6 +65,14 @@ export class LocalDataStore {
   }
 
   close() { this.flushSnapshot(); this.db.close(); }
+  readSetting(key: string): unknown {
+    const row = this.db.prepare("SELECT value_json FROM settings WHERE key=?").get(key) as { value_json: string } | undefined;
+    return row ? safeJson(row.value_json, null) : null;
+  }
+  writeSetting(key: string, value: unknown) {
+    this.db.prepare("INSERT INTO settings(key,value_json,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at")
+      .run(key, JSON.stringify(value ?? null), Date.now());
+  }
   readPersistedState(name: string): string | null {
     if (name !== STORE_NAME) return null;
     const settings = Object.fromEntries((this.db.prepare("SELECT key,value_json FROM settings").all() as {key:string;value_json:string}[]).map(({key,value_json}) => [key,safeJson(value_json,null)]));

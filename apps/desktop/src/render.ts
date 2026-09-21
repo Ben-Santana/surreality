@@ -30,6 +30,10 @@ function fillPolygon(ctx: CanvasRenderingContext2D, vertices: Point[], color: Rg
 }
 
 function drawEllipse(ctx: CanvasRenderingContext2D, mapping: Mapping) {
+  if (mapping.projectedOutline && mapping.projectedOutline.length >= 3) {
+    fillPolygon(ctx, mapping.projectedOutline, mapping.color);
+    return;
+  }
   const center = mapping.vertices[0];
   const rimU = mapping.vertices[1];
   const rimV = mapping.vertices[2];

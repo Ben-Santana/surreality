@@ -42,6 +42,22 @@ test("persists spaces and settings in SQLite", () => {
   });
 });
 
+test("persists native startup presentation settings independently", () => {
+  withStore((store) => {
+    const startup = {
+      enabled: true,
+      spaceId: "studio",
+      display: { id: 7, label: "Projector", width: 1920, height: 1080 },
+    };
+    store.writeSetting("startup-presentation", startup);
+    assert.deepEqual(store.readSetting("startup-presentation"), startup);
+
+    store.queuePersistedState("surreality", JSON.stringify({ version: 11, state: { spaces: [] } }));
+    store.flushSnapshot();
+    assert.deepEqual(store.readSetting("startup-presentation"), startup);
+  });
+});
+
 test("moves legacy data URLs into the content-addressed asset store", () => {
   withStore((store) => {
     const envelope = JSON.stringify({

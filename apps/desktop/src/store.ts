@@ -38,6 +38,7 @@ import type {
   PanelLayout,
   PanelSkew,
   Point,
+  PresentationCursor,
   Rgba,
   GridSize,
   Space,
@@ -64,6 +65,7 @@ type RoomState = {
   showGrid: boolean;
   snapToGrid: boolean;
   gridSize: GridSize;
+  presentationCursor: PresentationCursor;
   tool: Tool;
   contextMenu: ContextMenuState | null;
   projectorOpen: boolean;
@@ -77,6 +79,7 @@ type RoomState = {
   toggleGrid: () => void;
   toggleSnapToGrid: () => void;
   setGridSize: (size: GridSize) => void;
+  setPresentationCursor: (cursor: PresentationCursor) => void;
   select: (id: string | null) => void;
   addPolygon: (position: Point) => void;
   addPolygonVertices: (vertices: Point[]) => void;
@@ -412,6 +415,7 @@ export const useRoomStore = create<RoomState>()(
       showGrid: true,
       snapToGrid: false,
       gridSize: "medium",
+      presentationCursor: "hidden",
       tool: "select",
       customMappingPackageId: "room.mapping.media",
       contextMenu: null,
@@ -441,6 +445,7 @@ export const useRoomStore = create<RoomState>()(
         set({ snapToGrid: !get().snapToGrid });
       },
       setGridSize: (gridSize) => set({ gridSize }),
+      setPresentationCursor: (presentationCursor) => set({ presentationCursor }),
       select: (id) => set({ selectedId: id, editMode: true }),
       addPolygon: (position) => {
         const mapping = createPolygon(position);
@@ -937,6 +942,7 @@ export const useRoomStore = create<RoomState>()(
           showGrid: state.showGrid,
           snapToGrid: state.snapToGrid,
           gridSize: state.gridSize,
+          presentationCursor: state.presentationCursor,
           panelLayout: state.panelLayout,
           spaces,
         };
@@ -947,6 +953,7 @@ export const useRoomStore = create<RoomState>()(
           showGrid?: boolean;
           snapToGrid?: boolean;
           gridSize?: unknown;
+          presentationCursor?: unknown;
           panelLayout?: unknown;
           panelLayouts?: Partial<Record<string, unknown>>;
           panelPositions?: Partial<Record<string, Point>>;
@@ -1000,6 +1007,12 @@ export const useRoomStore = create<RoomState>()(
           showGrid: data.showGrid ?? true,
           snapToGrid: data.snapToGrid ?? false,
           gridSize: isGridSize(data.gridSize) ? data.gridSize : "medium",
+          presentationCursor:
+            data.presentationCursor === "crosshair" ||
+            data.presentationCursor === "dot" ||
+            data.presentationCursor === "default"
+              ? data.presentationCursor
+              : "hidden",
           panelLayout,
           spaces,
         };

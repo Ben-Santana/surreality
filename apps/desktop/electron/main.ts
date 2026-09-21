@@ -3,13 +3,14 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { BrowserWindow as ElectronWindow, MessageBoxOptions, OpenDialogOptions } from "electron";
+import type { BrowserWindow as ElectronWindow, MessageBoxOptions, OpenDialogOptions, Tray as ElectronTray } from "electron";
+import type { StartupPresentationSettings } from "../src/types";
 import { customMappingHasPermission, inspectCustomMappingArchive, installCustomMappingArchive, listInstalledCustomMappings, registerCustomMappingProtocol, uninstallCustomMapping } from "./customMappings";
 import { CloudService } from "./cloud";
 import { LocalDataStore } from "./persistence";
 import { startPackagePlugins, stopPackagePlugins } from "./plugins";
 
-const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, protocol, safeStorage, screen, session } = createRequire(import.meta.url)(
+const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, protocol, safeStorage, screen, session, Tray } = createRequire(import.meta.url)(
   "electron",
 ) as typeof import("electron");
 
@@ -26,6 +27,9 @@ protocol.registerSchemesAsPrivileged([
   { scheme: "surreality-asset", privileges: { secure: true, standard: true, supportFetchAPI: true, corsEnabled: true, stream: true } },
 ]);
 
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) app.quit();
+
 let editorWindow: ElectronWindow | null = null;
 let outputWindow: ElectronWindow | null = null;
 let controlsWindow: ElectronWindow | null = null;
@@ -33,6 +37,60 @@ let lastPayload: unknown = null;
 let lastControlsState: unknown = null;
 let localData: LocalDataStore | null = null;
 let cloud: CloudService | null = null;
+let backgroundTray: ElectronTray | null = null;
+let startupSessionActive = false;
+let startupPayload: unknown = null;
+let startupDisplayId: number | null = null;
+let retryingStartupOutput = false;
+
+const STARTUP_SETTINGS_KEY = "startup-presentation";
+const DEFAULT_STARTUP_SETTINGS: StartupPresentationSettings = { enabled: false, spaceId: null, display: null };
+
+function startupSettings(): StartupPresentationSettings {
+  const value = localData?.readSetting(STARTUP_SETTINGS_KEY);
+  if (!value || typeof value !== "object") return DEFAULT_STARTUP_SETTINGS;
+  const candidate = value as Partial<StartupPresentationSettings>;
+  const display = candidate.display;
+  return {
+    enabled: candidate.enabled === true,
+    spaceId: typeof candidate.spaceId === "string" ? candidate.spaceId : null,
+    display: display && typeof display.id === "number" && typeof display.label === "string" &&
+      typeof display.width === "number" && typeof display.height === "number"
+      ? { id: display.id, label: display.label, width: display.width, height: display.height }
+      : null,
+  };
+}
+
+function showEditor() {
+  if (!editorWindow) {
+    createEditor(true);
+    return;
+  }
+  editorWindow.show();
+  editorWindow.focus();
+}
+
+function ensureBackgroundTray() {
+  if (backgroundTray) return;
+  const icon = nativeImage.createFromPath(APP_ICON_PATH).resize({ width: 18, height: 18 });
+  backgroundTray = new Tray(icon);
+  backgroundTray.setToolTip("Surreality");
+  backgroundTray.setContextMenu(Menu.buildFromTemplate([
+    { label: "Show Surreality", click: showEditor },
+    {
+      label: "Stop startup presentation",
+      click: () => {
+        startupSessionActive = false;
+        startupPayload = null;
+        outputWindow?.close();
+        showEditor();
+      },
+    },
+    { type: "separator" },
+    { label: "Quit", click: () => app.quit() },
+  ]));
+  backgroundTray.on("click", showEditor);
+}
 
 function prepareThumbnail(filePath: string) {
   const maximumBytes = 2 * 1024 * 1024;
@@ -129,7 +187,7 @@ function loadWindow(win: ElectronWindow, search = "") {
   }
 }
 
-function createEditor() {
+function createEditor(showOnReady = true) {
   editorWindow = new BrowserWindow({
     width: 1480,
     height: 920,
@@ -148,7 +206,9 @@ function createEditor() {
     },
   });
 
-  editorWindow.once("ready-to-show", () => editorWindow?.show());
+  editorWindow.once("ready-to-show", () => {
+    if (showOnReady) editorWindow?.show();
+  });
   editorWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (!url.includes("mode=controls")) return { action: "deny" };
     return {
@@ -183,6 +243,8 @@ function createEditor() {
   });
   editorWindow.on("closed", () => {
     editorWindow = null;
+    startupSessionActive = false;
+    startupPayload = null;
     outputWindow?.close();
     controlsWindow?.close();
   });
@@ -190,17 +252,19 @@ function createEditor() {
   loadWindow(editorWindow);
 }
 
-function createOutput(displayId?: number) {
+function createOutput(displayId?: number, forceFullscreen = false, startupManaged = false, requireExactDisplay = false) {
   const displays = screen.getAllDisplays();
   const primary = screen.getPrimaryDisplay();
+  const exactDisplay = displays.find((item) => item.id === displayId);
+  if (requireExactDisplay && !exactDisplay) return false;
   const display =
-    displays.find((item) => item.id === displayId) ??
+    exactDisplay ??
     displays.find((item) => item.id !== primary.id) ??
     primary;
 
   outputWindow?.close();
 
-  const fullscreen = display.id !== primary.id || displays.length > 1;
+  const fullscreen = forceFullscreen || display.id !== primary.id || displays.length > 1;
   outputWindow = new BrowserWindow({
     x: display.bounds.x,
     y: display.bounds.y,
@@ -221,7 +285,14 @@ function createOutput(displayId?: number) {
 
   outputWindow.on("closed", () => {
     outputWindow = null;
+    startupDisplayId = null;
     editorWindow?.webContents.send("output-closed");
+    if (startupManaged && startupSessionActive && !retryingStartupOutput) {
+      startupSessionActive = false;
+      startupPayload = null;
+      showEditor();
+    }
+    retryingStartupOutput = false;
   });
 
   outputWindow.webContents.on("did-finish-load", () => {
@@ -231,6 +302,36 @@ function createOutput(displayId?: number) {
   });
 
   loadWindow(outputWindow, "?mode=output");
+  return true;
+}
+
+function matchingStartupDisplay(settings: StartupPresentationSettings) {
+  const wanted = settings.display;
+  if (!wanted) return null;
+  const displays = screen.getAllDisplays();
+  return displays.find((display) => display.id === wanted.id && display.label === wanted.label) ?? displays.find((display) =>
+    display.label === wanted.label &&
+    display.bounds.width === wanted.width &&
+    display.bounds.height === wanted.height
+  ) ?? null;
+}
+
+function tryStartupPresentation() {
+  if (!startupSessionActive || startupPayload == null || outputWindow) return false;
+  const settings = startupSettings();
+  if (!settings.enabled) return false;
+  const display = matchingStartupDisplay(settings);
+  if (!display) {
+    editorWindow?.hide();
+    ensureBackgroundTray();
+    return false;
+  }
+  lastPayload = startupPayload;
+  startupDisplayId = display.id;
+  if (!createOutput(display.id, true, true, true)) return false;
+  editorWindow?.hide();
+  ensureBackgroundTray();
+  return true;
 }
 
 function createControls() {
@@ -306,6 +407,15 @@ app.whenReady().then(() => {
   const appIcon = nativeImage.createFromPath(APP_ICON_PATH);
   if (!appIcon.isEmpty()) app.dock?.setIcon(appIcon);
   localData = new LocalDataStore(app.getPath("userData"));
+  const configuredStartup = startupSettings();
+  const loginLaunch = app.getLoginItemSettings();
+  startupSessionActive = configuredStartup.enabled && (
+    process.argv.includes("--startup-presentation") || loginLaunch.wasOpenedAtLogin
+  );
+  app.setLoginItemSettings({
+    openAtLogin: configuredStartup.enabled,
+    args: configuredStartup.enabled ? ["--startup-presentation"] : [],
+  });
   cloud = new CloudService(
     localData,
     app.getPath("userData"),
@@ -329,7 +439,8 @@ app.whenReady().then(() => {
   installMenu();
   registerCustomMappingProtocol(app, protocol);
   protocol.handle("surreality-asset", assetResponse);
-  createEditor();
+  createEditor(!startupSessionActive);
+  if (startupSessionActive) ensureBackgroundTray();
   const installedCustomMappings = () => listInstalledCustomMappings(app, (id, version) => localData?.packageInstallSource(id, version));
   const refreshPlugins = () => startPackagePlugins(app, installedCustomMappings(), (payload) => {
     for (const window of BrowserWindow.getAllWindows()) window.webContents.send("plugin:data", payload);
@@ -345,12 +456,58 @@ app.whenReady().then(() => {
     })),
   );
 
+  ipcMain.handle("startup:get-settings", () => startupSettings());
+  ipcMain.handle("startup:should-run", () => startupSessionActive);
+  ipcMain.handle("startup:set-settings", (_event, value: StartupPresentationSettings) => {
+    const settings: StartupPresentationSettings = {
+      enabled: value?.enabled === true,
+      spaceId: typeof value?.spaceId === "string" ? value.spaceId : null,
+      display: value?.display && typeof value.display.id === "number" && typeof value.display.label === "string" &&
+        typeof value.display.width === "number" && typeof value.display.height === "number"
+        ? { id: value.display.id, label: value.display.label, width: value.display.width, height: value.display.height }
+        : null,
+    };
+    localData?.writeSetting(STARTUP_SETTINGS_KEY, settings);
+    app.setLoginItemSettings({
+      openAtLogin: settings.enabled,
+      args: settings.enabled ? ["--startup-presentation"] : [],
+    });
+    if (!settings.enabled && startupSessionActive) {
+      startupSessionActive = false;
+      startupPayload = null;
+      outputWindow?.close();
+      showEditor();
+    }
+    return settings;
+  });
+  ipcMain.handle("startup:ready", (_event, payload: unknown) => {
+    if (!startupSessionActive) return false;
+    startupPayload = payload;
+    return tryStartupPresentation();
+  });
+  ipcMain.handle("startup:cancel", async (_event, message?: string) => {
+    startupSessionActive = false;
+    startupPayload = null;
+    showEditor();
+    if (message) {
+      await dialog.showMessageBox(editorWindow!, {
+        type: "warning",
+        title: "Startup presentation unavailable",
+        message,
+        buttons: ["OK"],
+      });
+    }
+  });
+
   ipcMain.handle("open-output", (_event, displayId?: number) => {
     createOutput(displayId);
   });
 
   ipcMain.handle("close-output", () => {
+    startupSessionActive = false;
+    startupPayload = null;
     outputWindow?.close();
+    showEditor();
   });
 
   ipcMain.handle("open-controls", () => createControls());
@@ -560,15 +717,33 @@ app.whenReady().then(() => {
 
   ipcMain.on("sync", (_event, payload: unknown) => {
     lastPayload = payload;
+    if (startupSessionActive) startupPayload = payload;
     if (outputWindow && !_event.sender.isDestroyed()) {
       outputWindow.webContents.send("sync", payload);
     }
   });
+  ipcMain.handle("sync:get", () => lastPayload);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createEditor();
+    } else {
+      showEditor();
     }
+  });
+  app.on("second-instance", showEditor);
+
+  const displaysChanged = () => {
+    for (const window of BrowserWindow.getAllWindows()) window.webContents.send("displays-changed");
+    tryStartupPresentation();
+  };
+  screen.on("display-added", displaysChanged);
+  screen.on("display-metrics-changed", displaysChanged);
+  screen.on("display-removed", (_event, display) => {
+    for (const window of BrowserWindow.getAllWindows()) window.webContents.send("displays-changed");
+    if (!startupSessionActive || startupDisplayId !== display.id || !outputWindow) return;
+    retryingStartupOutput = true;
+    outputWindow.close();
   });
 });
 
@@ -576,6 +751,8 @@ app.on("before-quit", () => {
   stopPackagePlugins();
   localData?.close();
   localData = null;
+  backgroundTray?.destroy();
+  backgroundTray = null;
 });
 
 app.on("window-all-closed", () => {

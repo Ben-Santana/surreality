@@ -200,6 +200,9 @@ export function mappingAnchor(mapping: Mapping): Point {
 
 export function mappingContainsBody(mapping: Mapping, point: Point): boolean {
   if (isCircleGeometry(mapping)) {
+    if (mapping.projectedOutline && mapping.projectedOutline.length >= 3) {
+      return pointInPolygon(point, mapping.projectedOutline);
+    }
     const center = mapping.vertices[0];
     const rimU = mapping.vertices[1];
     const rimV = mapping.vertices[2];

@@ -6,6 +6,8 @@ export type Tool = "select" | "surface" | "polygon" | "circle" | "text" | "custo
 
 export type GridSize = "small" | "medium" | "large";
 
+export type PresentationCursor = "crosshair" | "dot" | "hidden" | "default";
+
 export const GRID_STEPS: Record<GridSize, number> = {
   small: 24,
   medium: 48,
@@ -41,6 +43,12 @@ type MappingBase = {
    */
   vertices: Point[];
   surfaceId?: string | null;
+  /**
+   * Display-only perimeter for circles under perspective. A projected circle is
+   * a conic whose center is not the projected source center, so its three edit
+   * vertices alone cannot describe the visible outline accurately.
+   */
+  projectedOutline?: Point[];
 };
 
 export type WallSize = { width: number; height: number };
@@ -234,6 +242,17 @@ export type DisplayInfo = {
   primary: boolean;
 };
 
+export type StartupPresentationSettings = {
+  enabled: boolean;
+  spaceId: string | null;
+  display: {
+    id: number;
+    label: string;
+    width: number;
+    height: number;
+  } | null;
+};
+
 export type RoomAPI = {
   getDisplays: () => Promise<DisplayInfo[]>;
   openOutput: (displayId?: number) => Promise<void>;
@@ -248,6 +267,14 @@ export type RoomAPI = {
   onOutputClosed: (callback: () => void) => () => void;
   onUndo: (callback: () => void) => () => void;
   onRedo: (callback: () => void) => () => void;
+  startup: {
+    getSettings: () => Promise<StartupPresentationSettings>;
+    shouldRun: () => Promise<boolean>;
+    setSettings: (settings: StartupPresentationSettings) => Promise<StartupPresentationSettings>;
+    ready: (payload: SyncPayload) => Promise<boolean>;
+    cancel: (message?: string) => Promise<void>;
+    onDisplaysChanged: (callback: () => void) => () => void;
+  };
   listCustomMappings: () => Promise<CustomMappingPackageRecord[]>;
   importCustomMapping: () => Promise<CustomMappingImportResult>;
   uninstallCustomMapping: (packageId: string, packageVersion: string) => Promise<CustomMappingUninstallResult>;
@@ -292,6 +319,7 @@ export type RoomAPI = {
   };
   onPluginData: (callback: (payload: PluginDataMessage) => void) => () => void;
   sync: (payload: unknown) => void;
+  getSync: () => Promise<unknown | null>;
   onSync: (callback: (payload: unknown) => void) => () => void;
 };
 
@@ -303,6 +331,7 @@ export type PluginDataMessage = {
 
 export type SyncPayload = {
   mappings: Mapping[];
+  cursor?: PresentationCursor;
   /** Ephemeral, definition-owned state. Never persisted or added to undo history. */
   runtime?: Record<string, unknown>;
 };

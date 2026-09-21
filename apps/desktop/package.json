@@ -8,6 +8,9 @@
   "scripts": {
     "dev": "env -u ELECTRON_RUN_AS_NODE vite",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "dist:mac": "npm run build && electron-builder --mac dmg --arm64",
+    "dist:mac:adhoc": "npm run build && electron-builder --mac dmg --arm64 --config.mac.identity=- --config.mac.notarize=false && codesign --verify --deep --strict --verbose=2 release/mac-arm64/Surreality.app",
+    "dist:win": "npm run build && electron-builder --win nsis --x64",
     "check": "tsc -p tsconfig.json --noEmit",
     "check:supabase": "node scripts/check-supabase.mjs",
     "test": "node --test tests/*.test.mjs",
@@ -31,9 +34,56 @@
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.3",
     "electron": "^44.0.0",
+    "electron-builder": "^26.15.3",
     "tailwindcss": "^4.1.13",
     "typescript": "^5.9.2",
     "vite": "^7.1.6",
     "vite-plugin-electron": "^0.29.0"
+  },
+  "build": {
+    "appId": "com.surreality.desktop",
+    "productName": "Surreality",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.graphics-design",
+      "icon": "build/icon.png",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "dmg": {
+      "artifactName": "Surreality-${version}-${arch}.${ext}",
+      "title": "Surreality ${version}"
+    },
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "artifactName": "Surreality-Setup-${version}-${arch}.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }

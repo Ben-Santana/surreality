@@ -10,6 +10,15 @@ import { Permissions } from "./pages/Permissions";
 import { RuntimeApi } from "./pages/RuntimeApi";
 import { Plugins } from "./pages/Plugins";
 import { StyleGuide } from "./pages/StyleGuide";
+import { Landing } from "./pages/Landing";
+
+// Preserve existing shared documentation URLs after moving the guide.
+function redirectLegacyDocs() {
+  if (window.location.pathname === "/" && window.location.hash.startsWith("#/")) {
+    window.location.replace(`/docs${window.location.hash}`);
+  }
+}
+redirectLegacyDocs();
 
 function page(path: DocPath) {
   if (path === "/" || path === "/quickstart") return <Home path={path} />;
@@ -24,9 +33,13 @@ function page(path: DocPath) {
 }
 
 export default function App() {
+  const isDocs = /^\/docs\/?$/.test(window.location.pathname);
   const [path, setPath] = useState<DocPath>(() => pathFromHash());
   useEffect(() => {
-    const onHash = () => setPath(pathFromHash());
+    const onHash = () => {
+      redirectLegacyDocs();
+      setPath(pathFromHash());
+    };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
@@ -35,5 +48,9 @@ export default function App() {
     window.scrollTo(0, 0);
   }, [path]);
 
-  return <Layout path={path}>{page(path)}</Layout>;
+  useEffect(() => {
+    document.title = isDocs ? "Surreality developer guide" : "Surreality — Make room for the unreal";
+  }, [isDocs]);
+
+  return isDocs ? <Layout path={path}>{page(path)}</Layout> : <Landing />;
 }

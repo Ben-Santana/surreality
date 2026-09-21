@@ -34,6 +34,18 @@ contextBridge.exposeInMainWorld("room", {
     ipcRenderer.on("history-redo", handler);
     return () => ipcRenderer.removeListener("history-redo", handler);
   },
+  startup: {
+    getSettings: () => ipcRenderer.invoke("startup:get-settings"),
+    shouldRun: () => ipcRenderer.invoke("startup:should-run"),
+    setSettings: (settings: unknown) => ipcRenderer.invoke("startup:set-settings", settings),
+    ready: (payload: unknown) => ipcRenderer.invoke("startup:ready", payload),
+    cancel: (message?: string) => ipcRenderer.invoke("startup:cancel", message),
+    onDisplaysChanged: (callback: () => void) => {
+      const handler = () => callback();
+      ipcRenderer.on("displays-changed", handler);
+      return () => ipcRenderer.removeListener("displays-changed", handler);
+    },
+  },
   listCustomMappings: () => ipcRenderer.invoke("custom-mappings:list"),
   importCustomMapping: () => ipcRenderer.invoke("custom-mappings:import"),
   uninstallCustomMapping: (packageId: string, packageVersion: string) =>
@@ -99,6 +111,7 @@ contextBridge.exposeInMainWorld("room", {
     return () => ipcRenderer.removeListener("plugin:data", handler);
   },
   sync: (payload: unknown) => ipcRenderer.send("sync", payload),
+  getSync: () => ipcRenderer.invoke("sync:get"),
   onSync: (callback: (payload: unknown) => void) => {
     const handler = (_event: unknown, payload: unknown) => callback(payload);
     ipcRenderer.on("sync", handler);
