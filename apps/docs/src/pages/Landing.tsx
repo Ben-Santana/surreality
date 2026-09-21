@@ -4,9 +4,18 @@ import { SurrealityLockup } from "../Brand";
 import "../landing.css";
 
 const downloads = [
-  { name: "macOS", detail: "Apple silicon · .dmg", href: "/downloads/Surreality-1.0.0-arm64.dmg?build=89530f3c18bd", size: "132 MB", Icon: Apple },
-  { name: "Windows", detail: "64-bit · .exe", href: "/downloads/Surreality-Setup-1.0.0-x64.exe", size: "115 MB", Icon: Monitor },
+  { name: "macOS", detail: "Apple silicon · .dmg", href: downloadUrl(import.meta.env.VITE_DOWNLOAD_MAC_URL, "Surreality-1.0.0-arm64.dmg"), size: "132 MB", Icon: Apple },
+  { name: "Windows", detail: "64-bit · .exe", href: downloadUrl(import.meta.env.VITE_DOWNLOAD_WINDOWS_URL, "Surreality-Setup-1.0.0-x64.exe"), size: "115 MB", Icon: Monitor },
 ];
+
+function downloadUrl(configured: string | undefined, file: string) {
+  if (configured?.trim()) {
+    const url = new URL(configured.trim());
+    if (url.protocol !== "https:") throw new Error("Installer URLs must use HTTPS");
+    return url.href;
+  }
+  return `https://github.com/Ben-Santana/surreality/releases/download/v1.0.0-preview.1/${file}`;
+}
 
 export function Landing() {
   const heroRef = useRef<HTMLElement>(null);
@@ -61,11 +70,11 @@ export function Landing() {
           </div>
           <div className="download-options">
             {downloads.map(({ name, detail, href, size, Icon }) => (
-              <a className="download-card" href={href} download key={name}>
+              <a className="download-card" href={href} aria-disabled={!href || undefined} download={href?.startsWith("/") || undefined} key={name}>
                 <div className="download-card-top"><Icon size={30} strokeWidth={1.4} /><span>V 1.0.0</span></div>
                 <h3>Download for {name}</h3>
                 <p>{detail}</p>
-                <div className="download-card-bottom"><span>{size}</span><Download size={20} /></div>
+                <div className="download-card-bottom"><span>{href ? size : "Download coming soon"}</span>{href && <Download size={20} />}</div>
               </a>
             ))}
             <p className="download-docs">Want to build your own mappings? <a href="/docs">Explore the docs <ArrowUpRight size={14} /></a></p>
