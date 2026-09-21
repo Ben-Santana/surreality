@@ -62,12 +62,7 @@ export function Landing() {
           </div>
         </section>
 
-        <section className="download-section" id="downloads" aria-labelledby="download-title">
-          <div className="download-intro">
-            <p className="landing-eyebrow">01 / GET SURREALITY</p>
-            <h2 id="download-title">A new dimension.<br /><i>Same room.</i></h2>
-            <p>Start with a projector and a little imagination.<br />Surreality takes it from there.</p>
-          </div>
+        <section className="download-section" id="downloads" aria-label="Download Surreality">
           <div className="download-options">
             {downloads.map(({ name, detail, href, size, Icon }) => (
               <a className="download-card" href={href} aria-disabled={!href || undefined} download={href?.startsWith("/") || undefined} key={name}>
